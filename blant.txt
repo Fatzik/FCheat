@@ -18,6 +18,7 @@ function ConfigSystem.new()
     local self = setmetatable({}, ConfigSystem)
     self.configName = "BlatantConfig"
     self.configFolder = "BlatantCat"
+    self.configPath = nil
     return self
 end
 
@@ -66,11 +67,36 @@ function ConfigSystem:deserializeTable(tbl)
 end
 
 function ConfigSystem:getConfigPath()
+    if self.configPath then return self.configPath end
+    
+    local paths = {}
+    
     if isfolder and isfolder("workspace") then
-        return "workspace/" .. self.configFolder .. "/" .. self.configName .. ".json"
-    else
-        return self.configName .. ".json"
+        table.insert(paths, "workspace/" .. self.configFolder .. "/" .. self.configName .. ".json")
     end
+    
+    local executorName = getexecutorname and getexecutorname() or ""
+    if executorName == "ScriptWare" then
+        table.insert(paths, "scriptware/" .. self.configFolder .. "/" .. self.configName .. ".json")
+    elseif executorName == "Krnl" then
+        table.insert(paths, "krnl/" .. self.configFolder .. "/" .. self.configName .. ".json")
+    elseif executorName == "Fluxus" then
+        table.insert(paths, "fluxus/" .. self.configFolder .. "/" .. self.configName .. ".json")
+    elseif executorName == "Synapse X" or executorName == "Synapse" then
+        table.insert(paths, "synapse/" .. self.configFolder .. "/" .. self.configName .. ".json")
+    end
+    
+    table.insert(paths, self.configName .. ".json")
+    
+    for _, path in ipairs(paths) do
+        if isfile and isfile(path) then
+            self.configPath = path
+            return path
+        end
+    end
+    
+    self.configPath = paths[1]
+    return self.configPath
 end
 
 function ConfigSystem:save(data)
@@ -79,8 +105,11 @@ function ConfigSystem:save(data)
     local json = HttpService:JSONEncode(serialized)
     
     if isfolder then
-        if not isfolder("workspace/" .. self.configFolder) then
-            makefolder("workspace/" .. self.configFolder)
+        local folderPath = path:match("(.+)/[^/]+$")
+        if folderPath and not isfolder(folderPath) then
+            pcall(function()
+                makefolder(folderPath)
+            end)
         end
     end
     
@@ -97,9 +126,14 @@ end
 
 function ConfigSystem:load()
     local path = self:getConfigPath()
+    
+    if not isfile or not isfile(path) then
+        return nil
+    end
+    
     local success, data = pcall(function()
-        if isfile and isfile(path) then
-            local content = readfile(path)
+        local content = readfile(path)
+        if content and content ~= "" then
             return HttpService:JSONDecode(content)
         end
         return nil
@@ -109,6 +143,15 @@ function ConfigSystem:load()
         return self:deserializeTable(data)
     end
     return nil
+end
+
+function ConfigSystem:delete()
+    local path = self:getConfigPath()
+    pcall(function()
+        if isfile and isfile(path) then
+            delfile(path)
+        end
+    end)
 end
 
 -- ============================================
@@ -128,7 +171,8 @@ function UI.new()
     self._espEnabled = false
     self._openColorPickers = {}
     self._configSystem = ConfigSystem.new()
-    self._pendingUIUpdate = false
+    self._isConfigLoaded = false
+    self._configLoadAttempts = 0
     
     self._espSettings = {
         BoxEnabled = false,
@@ -194,6 +238,12 @@ function UI.new()
         active = false,
     }
     self._fovCircle = nil
+    self._aimbotState = {
+        currentTarget = nil,
+        isActive = false,
+        triggerbotCooldown = 0,
+        triggerbotFiring = false,
+    }
     
     self:_build()
     self:_setupToggle()
@@ -201,11 +251,8 @@ function UI.new()
     self:_setupAimbot()
     self:_setupMisc()
     
-    -- Автозагрузка конфига
-    task.spawn(function()
-        task.wait(0.5)
-        self:loadConfig()
-    end)
+    -- ЗАГРУЗКА КОНФИГА
+    self:_loadConfigWithRetry()
     
     return self
 end
@@ -219,6 +266,46 @@ end
 -- ============================================
 -- УПРАВЛЕНИЕ КОНФИГАМИ
 -- ============================================
+function UI:_loadConfigWithRetry()
+    -- Первая попытка сразу
+    task.spawn(function()
+        local loaded = self:loadConfig()
+        if loaded then
+            print("✅ Config loaded on first attempt!")
+            return
+        end
+        
+        -- Вторая попытка через 0.5 сек
+        task.wait(0.5)
+        self._configLoadAttempts = self._configLoadAttempts + 1
+        loaded = self:loadConfig()
+        if loaded then
+            print("✅ Config loaded on second attempt!")
+            return
+        end
+        
+        -- Третья попытка через 1 сек
+        task.wait(0.5)
+        self._configLoadAttempts = self._configLoadAttempts + 1
+        loaded = self:loadConfig()
+        if loaded then
+            print("✅ Config loaded on third attempt!")
+            return
+        end
+        
+        -- Четвертая попытка через 2 сек
+        task.wait(1)
+        self._configLoadAttempts = self._configLoadAttempts + 1
+        loaded = self:loadConfig()
+        if loaded then
+            print("✅ Config loaded on fourth attempt!")
+            return
+        end
+        
+        print("ℹ️ No config found after " .. self._configLoadAttempts .. " attempts, using defaults.")
+    end)
+end
+
 function UI:saveConfig()
     local config = {
         espSettings = self._espSettings,
@@ -231,6 +318,7 @@ function UI:saveConfig()
     
     local success = self._configSystem:save(config)
     if success then
+        self._isConfigLoaded = true
         print("✅ Config saved successfully!")
         self:_showNotification("Config Saved!", "Settings have been saved.")
     else
@@ -243,7 +331,6 @@ end
 function UI:loadConfig()
     local config = self._configSystem:load()
     if not config then
-        print("ℹ️ No saved config found, using defaults.")
         return false
     end
     
@@ -279,9 +366,36 @@ function UI:loadConfig()
         self._espEnabled = config.espEnabled
     end
     
+    self._isConfigLoaded = true
+    
+    -- Применяем загруженные настройки
+    self:_applyConfigToUI()
+    
     print("✅ Config loaded successfully!")
     self:_showNotification("Config Loaded!", "Settings have been loaded.")
     return true
+end
+
+function UI:_applyConfigToUI()
+    -- Применяем настройки Fly
+    if self._miscSettings.FlyEnabled then
+        self:_toggleFly(true)
+    end
+    
+    -- Применяем настройки WalkSpeed
+    if self._miscSettings.LoopWalkSpeed then
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.WalkSpeed = self._miscSettings.WalkSpeed
+                end
+            end
+        end)
+    end
+    
+    print("🔄 UI settings applied from config!")
 end
 
 function UI:resetToDefaults()
@@ -343,29 +457,51 @@ function UI:resetToDefaults()
     
     self._espEnabled = false
     
+    if self._flyState.active then
+        self:_toggleFly(false)
+    end
+    
+    self._isConfigLoaded = false
     self:_showNotification("Reset Complete!", "Settings restored to defaults.")
     print("🔄 Settings reset to defaults!")
 end
 
 function UI:_showNotification(title, message)
-    -- Простое уведомление в чат
-    local notification = Instance.new("TextLabel")
-    notification.Size = UDim2.new(0, 300, 0, 40)
-    notification.Position = UDim2.new(0.5, -150, 0.3, 0)
+    local notification = Instance.new("Frame")
+    notification.Size = UDim2.new(0, 300, 0, 60)
+    notification.Position = UDim2.new(0.5, -150, 0.3, -30)
     notification.BackgroundColor3 = Color3.fromRGB(20, 23, 27)
     notification.BackgroundTransparency = 0.1
     notification.BorderColor3 = Color3.fromRGB(0, 180, 180)
     notification.BorderSizePixel = 1
-    notification.TextColor3 = Color3.fromRGB(255, 255, 255)
-    notification.Font = Enum.Font.Code
-    notification.TextSize = 14
-    notification.Text = title .. "\n" .. message
     notification.ZIndex = 999
     notification.Parent = self._screenGui
     
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 24)
+    titleLabel.Position = UDim2.new(0, 10, 0, 2)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(0, 180, 180)
+    titleLabel.Font = Enum.Font.Code
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = notification
+    
+    local msgLabel = Instance.new("TextLabel")
+    msgLabel.Size = UDim2.new(1, 0, 0, 24)
+    msgLabel.Position = UDim2.new(0, 10, 0, 26)
+    msgLabel.BackgroundTransparency = 1
+    msgLabel.Text = message
+    msgLabel.TextColor3 = Color3.fromRGB(210, 215, 220)
+    msgLabel.Font = Enum.Font.Code
+    msgLabel.TextSize = 13
+    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+    msgLabel.Parent = notification
+    
     game:GetService("TweenService"):Create(notification, TweenInfo.new(0.3), {BackgroundTransparency = 0.8}):Play()
     
-    task.wait(2)
+    task.wait(2.5)
     notification:Destroy()
 end
 
@@ -1450,7 +1586,6 @@ end
 function UI:_buildInfoTab()
     local container = self._tabContents["INFO"]
     
-    -- Информационная группа
     local infoGB = self:_createGroupbox(container, "Session Info", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 0))
     infoGB.AutomaticSize = Enum.AutomaticSize.Y
 
@@ -1492,7 +1627,6 @@ function UI:_buildInfoTab()
     local configGB = self:_createGroupbox(container, "Config Management", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 0))
     configGB.AutomaticSize = Enum.AutomaticSize.Y
     
-    -- Кнопка загрузки
     local loadBtn = Instance.new("TextButton")
     loadBtn.Size = UDim2.new(1, -20, 0, 24)
     loadBtn.Position = UDim2.new(0, 10, 0, 10)
@@ -1509,7 +1643,6 @@ function UI:_buildInfoTab()
         self:loadConfig()
     end)
     
-    -- Кнопка сохранения
     local saveBtn = Instance.new("TextButton")
     saveBtn.Size = UDim2.new(1, -20, 0, 24)
     saveBtn.Position = UDim2.new(0, 10, 0, 40)
@@ -1526,7 +1659,6 @@ function UI:_buildInfoTab()
         self:saveConfig()
     end)
     
-    -- Кнопка сброса
     local resetBtn = Instance.new("TextButton")
     resetBtn.Size = UDim2.new(1, -20, 0, 24)
     resetBtn.Position = UDim2.new(0, 10, 0, 70)
@@ -1542,6 +1674,25 @@ function UI:_buildInfoTab()
     self:_connect(resetBtn.MouseButton1Click, function()
         self:resetToDefaults()
     end)
+    
+    -- Информация о конфиге
+    local configInfo = self:_createInfoLabel(configGB, "Config Status: Not Loaded")
+    configInfo.Size = UDim2.new(1, 0, 0, 20)
+    configInfo.Position = UDim2.new(0, 0, 0, 100)
+    configInfo.TextColor3 = Color3.fromRGB(200, 200, 100)
+    
+    -- Обновляем статус конфига
+    task.spawn(function()
+        while task.wait(1) do
+            if self._isConfigLoaded then
+                configInfo.Text = "Config Status: ✅ Loaded"
+                configInfo.TextColor3 = Color3.fromRGB(100, 200, 100)
+            else
+                configInfo.Text = "Config Status: ❌ Not Loaded"
+                configInfo.TextColor3 = Color3.fromRGB(200, 100, 100)
+            end
+        end
+    end)
 end
 
 -- ============================================
@@ -1555,7 +1706,6 @@ function UI:_setupToggle()
             self._screenGui.Enabled = self._visible
         end
         
-        -- Горячие клавиши для конфигов
         if input.KeyCode == Enum.KeyCode.F3 then
             self:saveConfig()
         elseif input.KeyCode == Enum.KeyCode.F4 then
@@ -1645,7 +1795,8 @@ function ESPObject:_createDrawings()
     self._drawings.roundedLines = {}
     for _ = 1, 24 do
         local l = Drawing.new("Line")
-        l.Visible = false        l.Color = Color3.fromRGB(0, 180, 180)
+        l.Visible = false
+        l.Color = Color3.fromRGB(0, 180, 180)
         l.Thickness = 1
         table.insert(self._drawings.roundedLines, l)
     end
@@ -2109,36 +2260,6 @@ end
 -- ============================================
 -- AIMBOT
 -- ============================================
-function UI:_getClosestPlayerToCenter(camera, fovRadius)
-    local centerScreen = camera.ViewportSize / 2
-    local best, bestD = nil, fovRadius
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p == LocalPlayer then continue end
-        if self._aimbotSettings.TeamCheck and self:_isTeammate(p) then continue end
-        if not p.Character then continue end
-        local h = p.Character:FindFirstChildOfClass("Humanoid")
-        if not h or h.Health <= 0 then continue end
-        local targetParts = {}
-        for _, partName in ipairs({"Head", "UpperTorso", "Torso", "HumanoidRootPart"}) do
-            local part = p.Character:FindFirstChild(partName)
-            if part then
-                table.insert(targetParts, part)
-            end
-        end
-        for _, part in ipairs(targetParts) do
-            local sp, onScreen = camera:WorldToViewportPoint(part.Position)
-            if not onScreen then continue end
-            local dist = (Vector2.new(sp.X, sp.Y) - centerScreen).Magnitude
-            if dist < bestD then
-                if self._aimbotSettings.WallCheck and not self:_isVisible(camera, part) then continue end
-                bestD = dist
-                best = p
-            end
-        end
-    end
-    return best, bestD
-end
-
 function UI:_setupAimbot()
     self._fovCircle = Drawing.new("Circle")
     self._fovCircle.Visible = false
@@ -2359,7 +2480,8 @@ function UI:_getAimPart(player)
     local name = ba
     if ba == "Torso" then
         name = player.Character:FindFirstChild("UpperTorso") and "UpperTorso" or "Torso"
-    end    return player.Character:FindFirstChild(name)
+    end
+    return player.Character:FindFirstChild(name)
 end
 
 function UI:_isVisible(camera, part)
@@ -2440,13 +2562,6 @@ function UI:_toggleFly(enabled)
 end
 
 function UI:_setupMisc()
-    self._aimbotState = {
-        currentTarget = nil,
-        isActive = false,
-        triggerbotCooldown = 0,
-        triggerbotFiring = false,
-    }
-
     self:_connect(UserInputService.JumpRequest, function()
         if self._miscSettings.InfiniteJump then
             pcall(function()
@@ -2559,7 +2674,10 @@ end
 -- ЗАПУСК
 -- ============================================
 if getgenv().BlatantUI then
-    pcall(function() getgenv().BlatantUI:destroy() end)
+    pcall(function() 
+        getgenv().BlatantUI:destroy() 
+    end)
+    getgenv().BlatantUI = nil
 end
 
 local blatantUI = UI.new()
@@ -2569,3 +2687,4 @@ print("✅ Blatant.cat loaded successfully!")
 print("📌 F2 - Toggle Menu")
 print("📌 F3 - Save Config")
 print("📌 F4 - Load Config")
+print("📌 Config auto-load enabled with retry mechanism!")
