@@ -9,7 +9,7 @@ local HttpService = cloneref(game:GetService("HttpService"))
 local LocalPlayer = Players.LocalPlayer
 
 -- ============================================
--- СИСТЕМА КОНФИГУРАЦИИ
+-- СИСТЕМА КОНФИГУРАЦИИ (УЛЬТРА-НАДЕЖНАЯ)
 -- ============================================
 local ConfigSystem = {}
 ConfigSystem.__index = ConfigSystem
@@ -19,6 +19,7 @@ function ConfigSystem.new()
     self.configName = "BlatantConfig"
     self.configFolder = "BlatantCat"
     self.configPath = nil
+    self.foundPaths = {}
     return self
 end
 
@@ -66,36 +67,79 @@ function ConfigSystem:deserializeTable(tbl)
     return result
 end
 
-function ConfigSystem:getConfigPath()
-    if self.configPath then return self.configPath end
-    
+function ConfigSystem:getAllPossiblePaths()
     local paths = {}
+    local executorName = getexecutorname and getexecutorname() or ""
     
     if isfolder and isfolder("workspace") then
         table.insert(paths, "workspace/" .. self.configFolder .. "/" .. self.configName .. ".json")
     end
     
-    local executorName = getexecutorname and getexecutorname() or ""
-    if executorName == "ScriptWare" then
-        table.insert(paths, "scriptware/" .. self.configFolder .. "/" .. self.configName .. ".json")
-    elseif executorName == "Krnl" then
-        table.insert(paths, "krnl/" .. self.configFolder .. "/" .. self.configName .. ".json")
-    elseif executorName == "Fluxus" then
-        table.insert(paths, "fluxus/" .. self.configFolder .. "/" .. self.configName .. ".json")
-    elseif executorName == "Synapse X" or executorName == "Synapse" then
-        table.insert(paths, "synapse/" .. self.configFolder .. "/" .. self.configName .. ".json")
+    local executorPaths = {
+        ["ScriptWare"] = "scriptware/",
+        ["Krnl"] = "krnl/",
+        ["Fluxus"] = "fluxus/",
+        ["Synapse X"] = "synapse/",
+        ["Synapse"] = "synapse/",
+        ["Oxygen U"] = "oxygen/",
+        ["Valyse"] = "valyse/",
+        ["Vega X"] = "vega/",
+        ["Electron"] = "electron/",
+        ["Calamari"] = "calamari/",
+        ["Seliware"] = "seliware/"
+    }
+    
+    if executorPaths[executorName] then
+        table.insert(paths, executorPaths[executorName] .. self.configFolder .. "/" .. self.configName .. ".json")
     end
     
     table.insert(paths, self.configName .. ".json")
     
+    if isfolder and isfolder("C:/") then
+        table.insert(paths, "C:/Users/" .. os.getenv("USERNAME") .. "/Desktop/" .. self.configName .. ".json")
+    end
+    
+    return paths
+end
+
+function ConfigSystem:findExistingConfig()
+    if self.configPath and isfile and isfile(self.configPath) then
+        return self.configPath
+    end
+    
+    local paths = self:getAllPossiblePaths()
+    self.foundPaths = {}
+    
     for _, path in ipairs(paths) do
         if isfile and isfile(path) then
+            table.insert(self.foundPaths, path)
             self.configPath = path
+            print("✅ Found config at: " .. path)
             return path
         end
     end
     
-    self.configPath = paths[1]
+    return nil
+end
+
+function ConfigSystem:getConfigPath()
+    if self.configPath then
+        if isfile and isfile(self.configPath) then
+            return self.configPath
+        end
+    end
+    
+    local found = self:findExistingConfig()
+    if found then
+        return found
+    end
+    
+    if isfolder and isfolder("workspace") then
+        self.configPath = "workspace/" .. self.configFolder .. "/" .. self.configName .. ".json"
+    else
+        self.configPath = self.configName .. ".json"
+    end
+    
     return self.configPath
 end
 
@@ -109,25 +153,28 @@ function ConfigSystem:save(data)
         if folderPath and not isfolder(folderPath) then
             pcall(function()
                 makefolder(folderPath)
+                print("📁 Created folder: " .. folderPath)
             end)
         end
     end
     
     local success, err = pcall(function()
         writefile(path, json)
+        print("💾 Config saved to: " .. path)
     end)
     
     if not success then
-        warn("Failed to save config: " .. tostring(err))
+        warn("❌ Failed to save config: " .. tostring(err))
         return false
     end
     return true
 end
 
 function ConfigSystem:load()
-    local path = self:getConfigPath()
+    local path = self:findExistingConfig()
     
-    if not isfile or not isfile(path) then
+    if not path then
+        print("ℹ️ No config file found")
         return nil
     end
     
@@ -140,18 +187,12 @@ function ConfigSystem:load()
     end)
     
     if success and data then
+        print("✅ Config loaded from: " .. path)
         return self:deserializeTable(data)
+    else
+        print("❌ Failed to load config from: " .. path)
+        return nil
     end
-    return nil
-end
-
-function ConfigSystem:delete()
-    local path = self:getConfigPath()
-    pcall(function()
-        if isfile and isfile(path) then
-            delfile(path)
-        end
-    end)
 end
 
 -- ============================================
@@ -251,8 +292,7 @@ function UI.new()
     self:_setupAimbot()
     self:_setupMisc()
     
-    -- ЗАГРУЗКА КОНФИГА
-    self:_loadConfigWithRetry()
+    self:_forceLoadConfig()
     
     return self
 end
@@ -264,46 +304,78 @@ function UI:_connect(signal, fn)
 end
 
 -- ============================================
--- УПРАВЛЕНИЕ КОНФИГАМИ
+-- ПРИНУДИТЕЛЬНАЯ ЗАГРУЗКА КОНФИГА
 -- ============================================
-function UI:_loadConfigWithRetry()
-    -- Первая попытка сразу
-    task.spawn(function()
-        local loaded = self:loadConfig()
-        if loaded then
-            print("✅ Config loaded on first attempt!")
-            return
+function UI:_forceLoadConfig()
+    print("🔄 Starting forced config load...")
+    self:_attemptLoad()
+    
+    local delays = {0.5, 0.5, 1, 1, 2, 2, 3, 3, 5, 5}
+    for i, delay in ipairs(delays) do
+        task.spawn(function()
+            task.wait(delay)
+            if not self._isConfigLoaded then
+                print("🔄 Attempt " .. (i + 1) .. " to load config...")
+                self:_attemptLoad()
+            end
+        end)
+    end
+end
+
+function UI:_attemptLoad()
+    self._configLoadAttempts = self._configLoadAttempts + 1
+    local config = self._configSystem:load()
+    
+    if not config then
+        if self._configLoadAttempts == 1 then
+            print("ℹ️ No config found, using defaults")
         end
-        
-        -- Вторая попытка через 0.5 сек
-        task.wait(0.5)
-        self._configLoadAttempts = self._configLoadAttempts + 1
-        loaded = self:loadConfig()
-        if loaded then
-            print("✅ Config loaded on second attempt!")
-            return
+        return false
+    end
+    
+    local loaded = false
+    
+    if config.espSettings then
+        for key, value in pairs(config.espSettings) do
+            if self._espSettings[key] ~= nil then
+                self._espSettings[key] = value
+                loaded = true
+            end
         end
-        
-        -- Третья попытка через 1 сек
-        task.wait(0.5)
-        self._configLoadAttempts = self._configLoadAttempts + 1
-        loaded = self:loadConfig()
-        if loaded then
-            print("✅ Config loaded on third attempt!")
-            return
+    end
+    
+    if config.aimbotSettings then
+        for key, value in pairs(config.aimbotSettings) do
+            if self._aimbotSettings[key] ~= nil then
+                self._aimbotSettings[key] = value
+                loaded = true
+            end
         end
-        
-        -- Четвертая попытка через 2 сек
-        task.wait(1)
-        self._configLoadAttempts = self._configLoadAttempts + 1
-        loaded = self:loadConfig()
-        if loaded then
-            print("✅ Config loaded on fourth attempt!")
-            return
+    end
+    
+    if config.miscSettings then
+        for key, value in pairs(config.miscSettings) do
+            if self._miscSettings[key] ~= nil then
+                self._miscSettings[key] = value
+                loaded = true
+            end
         end
-        
-        print("ℹ️ No config found after " .. self._configLoadAttempts .. " attempts, using defaults.")
-    end)
+    end
+    
+    if config.espEnabled ~= nil then
+        self._espEnabled = config.espEnabled
+        loaded = true
+    end
+    
+    if loaded then
+        self._isConfigLoaded = true
+        print("✅ CONFIG LOADED SUCCESSFULLY! (Attempt " .. self._configLoadAttempts .. ")")
+        self:_applyConfigToUI()
+        self:_showNotification("Config Loaded!", "Settings loaded successfully!")
+        return true
+    end
+    
+    return false
 end
 
 function UI:saveConfig()
@@ -329,60 +401,14 @@ function UI:saveConfig()
 end
 
 function UI:loadConfig()
-    local config = self._configSystem:load()
-    if not config then
-        return false
-    end
-    
-    -- Загружаем ESP настройки
-    if config.espSettings then
-        for key, value in pairs(config.espSettings) do
-            if self._espSettings[key] ~= nil then
-                self._espSettings[key] = value
-            end
-        end
-    end
-    
-    -- Загружаем Aimbot настройки
-    if config.aimbotSettings then
-        for key, value in pairs(config.aimbotSettings) do
-            if self._aimbotSettings[key] ~= nil then
-                self._aimbotSettings[key] = value
-            end
-        end
-    end
-    
-    -- Загружаем Misc настройки
-    if config.miscSettings then
-        for key, value in pairs(config.miscSettings) do
-            if self._miscSettings[key] ~= nil then
-                self._miscSettings[key] = value
-            end
-        end
-    end
-    
-    -- Загружаем состояние ESP
-    if config.espEnabled ~= nil then
-        self._espEnabled = config.espEnabled
-    end
-    
-    self._isConfigLoaded = true
-    
-    -- Применяем загруженные настройки
-    self:_applyConfigToUI()
-    
-    print("✅ Config loaded successfully!")
-    self:_showNotification("Config Loaded!", "Settings have been loaded.")
-    return true
+    return self:_attemptLoad()
 end
 
 function UI:_applyConfigToUI()
-    -- Применяем настройки Fly
     if self._miscSettings.FlyEnabled then
         self:_toggleFly(true)
     end
     
-    -- Применяем настройки WalkSpeed
     if self._miscSettings.LoopWalkSpeed then
         pcall(function()
             local char = LocalPlayer.Character
@@ -1623,7 +1649,6 @@ function UI:_buildInfoTab()
         end)
     end)
     
-    -- Группа управления конфигами
     local configGB = self:_createGroupbox(container, "Config Management", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 0))
     configGB.AutomaticSize = Enum.AutomaticSize.Y
     
@@ -1675,13 +1700,11 @@ function UI:_buildInfoTab()
         self:resetToDefaults()
     end)
     
-    -- Информация о конфиге
     local configInfo = self:_createInfoLabel(configGB, "Config Status: Not Loaded")
     configInfo.Size = UDim2.new(1, 0, 0, 20)
     configInfo.Position = UDim2.new(0, 0, 0, 100)
     configInfo.TextColor3 = Color3.fromRGB(200, 200, 100)
     
-    -- Обновляем статус конфига
     task.spawn(function()
         while task.wait(1) do
             if self._isConfigLoaded then
@@ -1696,7 +1719,7 @@ function UI:_buildInfoTab()
 end
 
 -- ============================================
--- TOGGLE (F2)
+-- TOGGLE
 -- ============================================
 function UI:_setupToggle()
     self:_connect(UserInputService.InputBegan, function(input, gpe)
@@ -2683,8 +2706,18 @@ end
 local blatantUI = UI.new()
 getgenv().BlatantUI = blatantUI
 
+print("=" .. string.rep("=", 50))
 print("✅ Blatant.cat loaded successfully!")
 print("📌 F2 - Toggle Menu")
 print("📌 F3 - Save Config")
-print("📌 F4 - Load Config")
-print("📌 Config auto-load enabled with retry mechanism!")
+print("📌 F4 - Force Load Config")
+print("📌 Config auto-load enabled with 10 attempts!")
+print("=" .. string.rep("=", 50))
+
+task.spawn(function()
+    task.wait(10)
+    if not blatantUI._isConfigLoaded then
+        print("⚠️ Config still not loaded after 10 seconds, forcing one more attempt...")
+        blatantUI:loadConfig()
+    end
+end)
