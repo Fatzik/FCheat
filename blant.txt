@@ -9,190 +9,70 @@ local HttpService = cloneref(game:GetService("HttpService"))
 local LocalPlayer = Players.LocalPlayer
 
 -- ============================================
--- СИСТЕМА КОНФИГУРАЦИИ (УЛЬТРА-НАДЕЖНАЯ)
+-- ПРОСТАЯ И НАДЕЖНАЯ СИСТЕМА КОНФИГОВ
 -- ============================================
-local ConfigSystem = {}
-ConfigSystem.__index = ConfigSystem
+local ConfigManager = {
+    ConfigName = "BlatantConfig",
+    ConfigFolder = "BlatantCat",
+    ConfigPath = nil
+}
 
-function ConfigSystem.new()
-    local self = setmetatable({}, ConfigSystem)
-    self.configName = "BlatantConfig"
-    self.configFolder = "BlatantCat"
-    self.configPath = nil
-    self.foundPaths = {}
-    return self
-end
-
-function ConfigSystem:color3ToTable(color)
-    if typeof(color) == "Color3" then
-        return {R = color.R, G = color.G, B = color.B}
-    end
-    return color
-end
-
-function ConfigSystem:tableToColor3(t)
-    if type(t) == "table" and t.R and t.G and t.B then
-        return Color3.new(t.R, t.G, t.B)
-    end
-    return t
-end
-
-function ConfigSystem:serializeTable(tbl)
-    local result = {}
-    for key, value in pairs(tbl) do
-        if type(value) == "table" then
-            result[key] = self:serializeTable(value)
-        elseif typeof(value) == "Color3" then
-            result[key] = self:color3ToTable(value)
-        else
-            result[key] = value
-        end
-    end
-    return result
-end
-
-function ConfigSystem:deserializeTable(tbl)
-    local result = {}
-    for key, value in pairs(tbl) do
-        if type(value) == "table" then
-            if value.R and value.G and value.B then
-                result[key] = self:tableToColor3(value)
-            else
-                result[key] = self:deserializeTable(value)
-            end
-        else
-            result[key] = value
-        end
-    end
-    return result
-end
-
-function ConfigSystem:getAllPossiblePaths()
-    local paths = {}
-    local executorName = getexecutorname and getexecutorname() or ""
+function ConfigManager:GetPath()
+    if self.ConfigPath then return self.ConfigPath end
     
-    if isfolder and isfolder("workspace") then
-        table.insert(paths, "workspace/" .. self.configFolder .. "/" .. self.configName .. ".json")
-    end
-    
-    local executorPaths = {
-        ["ScriptWare"] = "scriptware/",
-        ["Krnl"] = "krnl/",
-        ["Fluxus"] = "fluxus/",
-        ["Synapse X"] = "synapse/",
-        ["Synapse"] = "synapse/",
-        ["Oxygen U"] = "oxygen/",
-        ["Valyse"] = "valyse/",
-        ["Vega X"] = "vega/",
-        ["Electron"] = "electron/",
-        ["Calamari"] = "calamari/",
-        ["Seliware"] = "seliware/"
+    local paths = {
+        "workspace/" .. self.ConfigFolder .. "/" .. self.ConfigName .. ".json",
+        self.ConfigName .. ".json"
     }
     
-    if executorPaths[executorName] then
-        table.insert(paths, executorPaths[executorName] .. self.configFolder .. "/" .. self.configName .. ".json")
-    end
-    
-    table.insert(paths, self.configName .. ".json")
-    
-    if isfolder and isfolder("C:/") then
-        table.insert(paths, "C:/Users/" .. os.getenv("USERNAME") .. "/Desktop/" .. self.configName .. ".json")
-    end
-    
-    return paths
-end
-
-function ConfigSystem:findExistingConfig()
-    if self.configPath and isfile and isfile(self.configPath) then
-        return self.configPath
-    end
-    
-    local paths = self:getAllPossiblePaths()
-    self.foundPaths = {}
-    
+    -- Проверяем существующие файлы
     for _, path in ipairs(paths) do
         if isfile and isfile(path) then
-            table.insert(self.foundPaths, path)
-            self.configPath = path
-            print("✅ Found config at: " .. path)
+            self.ConfigPath = path
             return path
         end
     end
     
-    return nil
+    -- Если нет файла, используем первый путь
+    self.ConfigPath = paths[1]
+    return self.ConfigPath
 end
 
-function ConfigSystem:getConfigPath()
-    if self.configPath then
-        if isfile and isfile(self.configPath) then
-            return self.configPath
-        end
-    end
+function ConfigManager:Save(data)
+    local path = self:GetPath()
+    local json = HttpService:JSONEncode(data)
     
-    local found = self:findExistingConfig()
-    if found then
-        return found
-    end
-    
-    if isfolder and isfolder("workspace") then
-        self.configPath = "workspace/" .. self.configFolder .. "/" .. self.configName .. ".json"
-    else
-        self.configPath = self.configName .. ".json"
-    end
-    
-    return self.configPath
-end
-
-function ConfigSystem:save(data)
-    local path = self:getConfigPath()
-    local serialized = self:serializeTable(data)
-    local json = HttpService:JSONEncode(serialized)
-    
+    -- Создаем папку
     if isfolder then
-        local folderPath = path:match("(.+)/[^/]+$")
-        if folderPath and not isfolder(folderPath) then
-            pcall(function()
-                makefolder(folderPath)
-                print("📁 Created folder: " .. folderPath)
-            end)
+        local folder = path:match("(.+)/[^/]+$")
+        if folder and not isfolder(folder) then
+            pcall(function() makefolder(folder) end)
         end
     end
     
-    local success, err = pcall(function()
+    local success = pcall(function()
         writefile(path, json)
-        print("💾 Config saved to: " .. path)
     end)
     
-    if not success then
-        warn("❌ Failed to save config: " .. tostring(err))
-        return false
-    end
-    return true
+    return success
 end
 
-function ConfigSystem:load()
-    local path = self:findExistingConfig()
+function ConfigManager:Load()
+    local path = self:GetPath()
     
-    if not path then
-        print("ℹ️ No config file found")
+    if not isfile or not isfile(path) then
         return nil
     end
     
     local success, data = pcall(function()
         local content = readfile(path)
-        if content and content ~= "" then
-            return HttpService:JSONDecode(content)
-        end
-        return nil
+        return HttpService:JSONDecode(content)
     end)
     
     if success and data then
-        print("✅ Config loaded from: " .. path)
-        return self:deserializeTable(data)
-    else
-        print("❌ Failed to load config from: " .. path)
-        return nil
+        return data
     end
+    return nil
 end
 
 -- ============================================
@@ -211,10 +91,9 @@ function UI.new()
     self._espObjects = {}
     self._espEnabled = false
     self._openColorPickers = {}
-    self._configSystem = ConfigSystem.new()
-    self._isConfigLoaded = false
-    self._configLoadAttempts = 0
+    self._configLoaded = false
     
+    -- НАСТРОЙКИ ПО УМОЛЧАНИЮ
     self._espSettings = {
         BoxEnabled = false,
         BoxType = "Standard",
@@ -275,15 +154,11 @@ function UI.new()
         active = false,
         cfLoop = nil,
     }
-    self._noclipState = {
-        active = false,
-    }
     self._fovCircle = nil
     self._aimbotState = {
         currentTarget = nil,
         isActive = false,
         triggerbotCooldown = 0,
-        triggerbotFiring = false,
     }
     
     self:_build()
@@ -292,7 +167,8 @@ function UI.new()
     self:_setupAimbot()
     self:_setupMisc()
     
-    self:_forceLoadConfig()
+    -- ЗАГРУЗКА КОНФИГА
+    self:LoadConfig()
     
     return self
 end
@@ -304,127 +180,109 @@ function UI:_connect(signal, fn)
 end
 
 -- ============================================
--- ПРИНУДИТЕЛЬНАЯ ЗАГРУЗКА КОНФИГА
+-- РАБОТА С КОНФИГАМИ (ПРОСТО И НАДЕЖНО)
 -- ============================================
-function UI:_forceLoadConfig()
-    print("🔄 Starting forced config load...")
-    self:_attemptLoad()
-    
-    local delays = {0.5, 0.5, 1, 1, 2, 2, 3, 3, 5, 5}
-    for i, delay in ipairs(delays) do
-        task.spawn(function()
-            task.wait(delay)
-            if not self._isConfigLoaded then
-                print("🔄 Attempt " .. (i + 1) .. " to load config...")
-                self:_attemptLoad()
-            end
-        end)
-    end
-end
-
-function UI:_attemptLoad()
-    self._configLoadAttempts = self._configLoadAttempts + 1
-    local config = self._configSystem:load()
-    
-    if not config then
-        if self._configLoadAttempts == 1 then
-            print("ℹ️ No config found, using defaults")
-        end
-        return false
-    end
-    
-    local loaded = false
-    
-    if config.espSettings then
-        for key, value in pairs(config.espSettings) do
-            if self._espSettings[key] ~= nil then
-                self._espSettings[key] = value
-                loaded = true
-            end
-        end
-    end
-    
-    if config.aimbotSettings then
-        for key, value in pairs(config.aimbotSettings) do
-            if self._aimbotSettings[key] ~= nil then
-                self._aimbotSettings[key] = value
-                loaded = true
-            end
-        end
-    end
-    
-    if config.miscSettings then
-        for key, value in pairs(config.miscSettings) do
-            if self._miscSettings[key] ~= nil then
-                self._miscSettings[key] = value
-                loaded = true
-            end
-        end
-    end
-    
-    if config.espEnabled ~= nil then
-        self._espEnabled = config.espEnabled
-        loaded = true
-    end
-    
-    if loaded then
-        self._isConfigLoaded = true
-        print("✅ CONFIG LOADED SUCCESSFULLY! (Attempt " .. self._configLoadAttempts .. ")")
-        self:_applyConfigToUI()
-        self:_showNotification("Config Loaded!", "Settings loaded successfully!")
-        return true
-    end
-    
-    return false
-end
-
-function UI:saveConfig()
+function UI:SaveConfig()
     local config = {
-        espSettings = self._espSettings,
-        aimbotSettings = self._aimbotSettings,
-        miscSettings = self._miscSettings,
+        espSettings = {},
+        aimbotSettings = {},
+        miscSettings = {},
         espEnabled = self._espEnabled,
-        timestamp = os.time(),
         version = "1.0"
     }
     
-    local success = self._configSystem:save(config)
+    -- Сохраняем ESP настройки
+    for key, value in pairs(self._espSettings) do
+        if typeof(value) == "Color3" then
+            config.espSettings[key] = {R = value.R, G = value.G, B = value.B}
+        else
+            config.espSettings[key] = value
+        end
+    end
+    
+    -- Сохраняем Aimbot настройки
+    for key, value in pairs(self._aimbotSettings) do
+        if typeof(value) == "Color3" then
+            config.aimbotSettings[key] = {R = value.R, G = value.G, B = value.B}
+        else
+            config.aimbotSettings[key] = value
+        end
+    end
+    
+    -- Сохраняем Misc настройки
+    for key, value in pairs(self._miscSettings) do
+        config.miscSettings[key] = value
+    end
+    
+    local success = ConfigManager:Save(config)
     if success then
-        self._isConfigLoaded = true
-        print("✅ Config saved successfully!")
-        self:_showNotification("Config Saved!", "Settings have been saved.")
+        self._configLoaded = true
+        print("✅ Config saved!")
+        self:ShowNotification("✅ Config Saved!", "Settings saved successfully!")
     else
-        warn("❌ Failed to save config!")
-        self:_showNotification("Save Failed!", "Could not save config.")
+        print("❌ Failed to save config!")
+        self:ShowNotification("❌ Save Failed!", "Could not save config!")
     end
     return success
 end
 
-function UI:loadConfig()
-    return self:_attemptLoad()
-end
-
-function UI:_applyConfigToUI()
-    if self._miscSettings.FlyEnabled then
-        self:_toggleFly(true)
+function UI:LoadConfig()
+    local config = ConfigManager:Load()
+    if not config then
+        print("ℹ️ No config found, using defaults")
+        self:ShowNotification("ℹ️ No Config", "Using default settings")
+        return false
     end
     
-    if self._miscSettings.LoopWalkSpeed then
-        pcall(function()
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    hum.WalkSpeed = self._miscSettings.WalkSpeed
-                end
+    -- Загружаем ESP настройки
+    if config.espSettings then
+        for key, value in pairs(config.espSettings) do
+            if type(value) == "table" and value.R and value.G and value.B then
+                self._espSettings[key] = Color3.new(value.R, value.G, value.B)
+            elseif self._espSettings[key] ~= nil then
+                self._espSettings[key] = value
             end
-        end)
+        end
     end
     
-    print("🔄 UI settings applied from config!")
+    -- Загружаем Aimbot настройки
+    if config.aimbotSettings then
+        for key, value in pairs(config.aimbotSettings) do
+            if type(value) == "table" and value.R and value.G and value.B then
+                self._aimbotSettings[key] = Color3.new(value.R, value.G, value.B)
+            elseif self._aimbotSettings[key] ~= nil then
+                self._aimbotSettings[key] = value
+            end
+        end
+    end
+    
+    -- Загружаем Misc настройки
+    if config.miscSettings then
+        for key, value in pairs(config.miscSettings) do
+            if self._miscSettings[key] ~= nil then
+                self._miscSettings[key] = value
+            end
+        end
+    end
+    
+    -- Загружаем состояние ESP
+    if config.espEnabled ~= nil then
+        self._espEnabled = config.espEnabled
+    end
+    
+    self._configLoaded = true
+    print("✅ Config loaded!")
+    self:ShowNotification("✅ Config Loaded!", "Settings loaded successfully!")
+    
+    -- Применяем настройки
+    if self._miscSettings.FlyEnabled then
+        self:ToggleFly(true)
+    end
+    
+    return true
 end
 
-function UI:resetToDefaults()
+function UI:ResetDefaults()
     self._espSettings = {
         BoxEnabled = false,
         BoxType = "Standard",
@@ -484,51 +342,50 @@ function UI:resetToDefaults()
     self._espEnabled = false
     
     if self._flyState.active then
-        self:_toggleFly(false)
+        self:ToggleFly(false)
     end
     
-    self._isConfigLoaded = false
-    self:_showNotification("Reset Complete!", "Settings restored to defaults.")
+    self._configLoaded = false
+    self:ShowNotification("🔄 Reset", "Settings reset to defaults!")
     print("🔄 Settings reset to defaults!")
 end
 
-function UI:_showNotification(title, message)
-    local notification = Instance.new("Frame")
-    notification.Size = UDim2.new(0, 300, 0, 60)
-    notification.Position = UDim2.new(0.5, -150, 0.3, -30)
-    notification.BackgroundColor3 = Color3.fromRGB(20, 23, 27)
-    notification.BackgroundTransparency = 0.1
-    notification.BorderColor3 = Color3.fromRGB(0, 180, 180)
-    notification.BorderSizePixel = 1
-    notification.ZIndex = 999
-    notification.Parent = self._screenGui
+function UI:ShowNotification(title, message)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 300, 0, 60)
+    notif.Position = UDim2.new(0.5, -150, 0.3, -30)
+    notif.BackgroundColor3 = Color3.fromRGB(20, 23, 27)
+    notif.BackgroundTransparency = 0.1
+    notif.BorderColor3 = Color3.fromRGB(0, 180, 180)
+    notif.BorderSizePixel = 1
+    notif.ZIndex = 999
+    notif.Parent = self._screenGui
     
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0, 24)
-    titleLabel.Position = UDim2.new(0, 10, 0, 2)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.fromRGB(0, 180, 180)
-    titleLabel.Font = Enum.Font.Code
-    titleLabel.TextSize = 14
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = notification
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, 0, 0, 24)
+    titleLbl.Position = UDim2.new(0, 10, 0, 2)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = title
+    titleLbl.TextColor3 = Color3.fromRGB(0, 180, 180)
+    titleLbl.Font = Enum.Font.Code
+    titleLbl.TextSize = 14
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.Parent = notif
     
-    local msgLabel = Instance.new("TextLabel")
-    msgLabel.Size = UDim2.new(1, 0, 0, 24)
-    msgLabel.Position = UDim2.new(0, 10, 0, 26)
-    msgLabel.BackgroundTransparency = 1
-    msgLabel.Text = message
-    msgLabel.TextColor3 = Color3.fromRGB(210, 215, 220)
-    msgLabel.Font = Enum.Font.Code
-    msgLabel.TextSize = 13
-    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
-    msgLabel.Parent = notification
+    local msgLbl = Instance.new("TextLabel")
+    msgLbl.Size = UDim2.new(1, 0, 0, 24)
+    msgLbl.Position = UDim2.new(0, 10, 0, 26)
+    msgLbl.BackgroundTransparency = 1
+    msgLbl.Text = message
+    msgLbl.TextColor3 = Color3.fromRGB(210, 215, 220)
+    msgLbl.Font = Enum.Font.Code
+    msgLbl.TextSize = 13
+    msgLbl.TextXAlignment = Enum.TextXAlignment.Left
+    msgLbl.Parent = notif
     
-    game:GetService("TweenService"):Create(notification, TweenInfo.new(0.3), {BackgroundTransparency = 0.8}):Play()
-    
+    game:GetService("TweenService"):Create(notif, TweenInfo.new(0.3), {BackgroundTransparency = 0.8}):Play()
     task.wait(2.5)
-    notification:Destroy()
+    notif:Destroy()
 end
 
 -- ============================================
@@ -1568,7 +1425,7 @@ function UI:_buildMiscTab()
 
     self:_createCheckbox(moveGB, "Fly (CFrame)", self._miscSettings.FlyEnabled, function(v)
         self._miscSettings.FlyEnabled = v
-        self:_toggleFly(v)
+        self:ToggleFly(v)
     end)
 
     self:_createSlider(moveGB, "Fly Speed", 1, 300, self._miscSettings.FlySpeed, function(v)
@@ -1649,6 +1506,7 @@ function UI:_buildInfoTab()
         end)
     end)
     
+    -- КОНФИГИ
     local configGB = self:_createGroupbox(container, "Config Management", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 0))
     configGB.AutomaticSize = Enum.AutomaticSize.Y
     
@@ -1665,7 +1523,7 @@ function UI:_buildInfoTab()
     loadBtn.Parent = configGB
     
     self:_connect(loadBtn.MouseButton1Click, function()
-        self:loadConfig()
+        self:LoadConfig()
     end)
     
     local saveBtn = Instance.new("TextButton")
@@ -1681,7 +1539,7 @@ function UI:_buildInfoTab()
     saveBtn.Parent = configGB
     
     self:_connect(saveBtn.MouseButton1Click, function()
-        self:saveConfig()
+        self:SaveConfig()
     end)
     
     local resetBtn = Instance.new("TextButton")
@@ -1697,7 +1555,7 @@ function UI:_buildInfoTab()
     resetBtn.Parent = configGB
     
     self:_connect(resetBtn.MouseButton1Click, function()
-        self:resetToDefaults()
+        self:ResetDefaults()
     end)
     
     local configInfo = self:_createInfoLabel(configGB, "Config Status: Not Loaded")
@@ -1707,7 +1565,7 @@ function UI:_buildInfoTab()
     
     task.spawn(function()
         while task.wait(1) do
-            if self._isConfigLoaded then
+            if self._configLoaded then
                 configInfo.Text = "Config Status: ✅ Loaded"
                 configInfo.TextColor3 = Color3.fromRGB(100, 200, 100)
             else
@@ -1730,9 +1588,9 @@ function UI:_setupToggle()
         end
         
         if input.KeyCode == Enum.KeyCode.F3 then
-            self:saveConfig()
+            self:SaveConfig()
         elseif input.KeyCode == Enum.KeyCode.F4 then
-            self:loadConfig()
+            self:LoadConfig()
         end
     end)
 end
@@ -2522,29 +2380,7 @@ end
 -- ============================================
 -- MISC
 -- ============================================
-function UI:_cleanupFly()
-    pcall(function()
-        if self._flyState.cfLoop then
-            self._flyState.cfLoop:Disconnect()
-            self._flyState.cfLoop = nil
-        end
-    end)
-    pcall(function()
-        local char = LocalPlayer.Character
-        if char then
-            local head = char:FindFirstChild("Head")
-            if head then
-                head.Anchored = false
-            end
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.PlatformStand = false
-            end
-        end
-    end)
-end
-
-function UI:_toggleFly(enabled)
+function UI:ToggleFly(enabled)
     if enabled then
         self._flyState.active = true
         pcall(function()
@@ -2553,9 +2389,15 @@ function UI:_toggleFly(enabled)
             local hum = char:FindFirstChildOfClass("Humanoid")
             local head = char:WaitForChild("Head")
             if not hum or not head then return end
-            self:_cleanupFly()
+            
+            if self._flyState.cfLoop then
+                self._flyState.cfLoop:Disconnect()
+                self._flyState.cfLoop = nil
+            end
+            
             hum.PlatformStand = true
             head.Anchored = true
+            
             self._flyState.cfLoop = RunService.Heartbeat:Connect(function(deltaTime)
                 pcall(function()
                     local c = LocalPlayer.Character
@@ -2580,7 +2422,19 @@ function UI:_toggleFly(enabled)
         end)
     else
         self._flyState.active = false
-        self:_cleanupFly()
+        if self._flyState.cfLoop then
+            self._flyState.cfLoop:Disconnect()
+            self._flyState.cfLoop = nil
+        end
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char then
+                local head = char:FindFirstChild("Head")
+                if head then head.Anchored = false end
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.PlatformStand = false end
+            end
+        end)
     end
 end
 
@@ -2597,16 +2451,14 @@ function UI:_setupMisc()
         end
     end)
 
-    local function onCharacterAdded(char)
+    self:_connect(LocalPlayer.CharacterAdded, function()
         if self._flyState.active then
             task.wait(0.5)
-            self:_toggleFly(false)
+            self:ToggleFly(false)
             task.wait(0.1)
-            self:_toggleFly(true)
+            self:ToggleFly(true)
         end
-    end
-
-    self:_connect(LocalPlayer.CharacterAdded, onCharacterAdded)
+    end)
 
     self:_connect(RunService.Stepped, function()
         if self._miscSettings.NoclipEnabled then
@@ -2684,7 +2536,7 @@ function UI:destroy()
     for _, c in ipairs(self._connections) do pcall(function() c:Disconnect() end) end
     for _, o in pairs(self._espObjects) do o:destroy() end
     if self._fovCircle then pcall(function() self._fovCircle:Remove() end) end
-    self:_cleanupFly()
+    if self._flyState.cfLoop then pcall(function() self._flyState.cfLoop:Disconnect() end) end
     for _, pf in ipairs(self._openColorPickers) do
         pcall(function() pf:Destroy() end)
     end
@@ -2710,14 +2562,6 @@ print("=" .. string.rep("=", 50))
 print("✅ Blatant.cat loaded successfully!")
 print("📌 F2 - Toggle Menu")
 print("📌 F3 - Save Config")
-print("📌 F4 - Force Load Config")
-print("📌 Config auto-load enabled with 10 attempts!")
+print("📌 F4 - Load Config")
+print("📌 Config auto-load enabled!")
 print("=" .. string.rep("=", 50))
-
-task.spawn(function()
-    task.wait(10)
-    if not blatantUI._isConfigLoaded then
-        print("⚠️ Config still not loaded after 10 seconds, forcing one more attempt...")
-        blatantUI:loadConfig()
-    end
-end)
