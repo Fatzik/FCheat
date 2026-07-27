@@ -9,39 +9,35 @@ local HttpService = cloneref(game:GetService("HttpService"))
 local LocalPlayer = Players.LocalPlayer
 
 -- ============================================
--- ПРОСТАЯ СИСТЕМА КОНФИГОВ
+-- САМАЯ ПРОСТАЯ СИСТЕМА КОНФИГОВ
 -- ============================================
-local function SaveConfig(data)
-    local path = "BlatantConfig.json"
+local CONFIG_FILE = "BlatantConfig.txt" -- Используем .txt для простоты
+
+function SaveConfig(data)
     local json = HttpService:JSONEncode(data)
-    local success, err = pcall(function()
-        writefile(path, json)
+    local success = pcall(function()
+        writefile(CONFIG_FILE, json)
+        print("✅ Config saved to: " .. CONFIG_FILE)
     end)
-    if success then
-        print("✅ Config saved to: " .. path)
-    else
-        print("❌ Save error: " .. tostring(err))
-    end
     return success
 end
 
-local function LoadConfig()
-    local path = "BlatantConfig.json"
-    if not isfile or not isfile(path) then
-        print("ℹ️ No config file found")
+function LoadConfig()
+    if not isfile or not isfile(CONFIG_FILE) then
+        print("ℹ️ No config file: " .. CONFIG_FILE)
         return nil
     end
+    
     local success, data = pcall(function()
-        local content = readfile(path)
+        local content = readfile(CONFIG_FILE)
         return HttpService:JSONDecode(content)
     end)
+    
     if success and data then
-        print("✅ Config loaded from: " .. path)
+        print("✅ Config loaded from: " .. CONFIG_FILE)
         return data
-    else
-        print("❌ Load error")
-        return nil
     end
+    return nil
 end
 
 -- ============================================
@@ -134,8 +130,11 @@ function UI.new()
     self:_setupAimbot()
     self:_setupMisc()
     
-    -- ЗАГРУЗКА КОНФИГА
-    self:LoadConfig()
+    -- ЗАГРУЗКА КОНФИГА ПРИ ЗАПУСКЕ
+    task.spawn(function()
+        task.wait(0.5)
+        self:LoadConfig()
+    end)
     
     return self
 end
@@ -147,114 +146,100 @@ function UI:_connect(signal, fn)
 end
 
 -- ============================================
--- РАБОТА С КОНФИГАМИ (ПРОСТО И ПОНЯТНО)
+-- РАБОТА С КОНФИГАМИ (МАКСИМАЛЬНО ПРОСТО)
 -- ============================================
 function UI:SaveConfig()
-    print("💾 Saving config...")
+    print("💾 SAVING CONFIG...")
     
-    -- Конвертируем Color3 в таблицы
-    local function colorToTable(c)
-        return {R = c.R, G = c.G, B = c.B}
-    end
-    
-    local config = {
+    -- Собираем данные
+    local data = {
         espEnabled = self._espEnabled,
-        espSettings = {},
-        aimbotSettings = {},
-        miscSettings = {}
+        esp = {},
+        aimbot = {},
+        misc = {}
     }
     
-    -- ESP Settings
+    -- ESP
     for k, v in pairs(self._espSettings) do
         if typeof(v) == "Color3" then
-            config.espSettings[k] = colorToTable(v)
+            data.esp[k] = {r = v.R, g = v.G, b = v.B}
         else
-            config.espSettings[k] = v
+            data.esp[k] = v
         end
     end
     
-    -- Aimbot Settings (включая Smoothness)
+    -- AIMBOT (Smoothness обязательно сохранится)
     for k, v in pairs(self._aimbotSettings) do
         if typeof(v) == "Color3" then
-            config.aimbotSettings[k] = colorToTable(v)
+            data.aimbot[k] = {r = v.R, g = v.G, b = v.B}
         else
-            config.aimbotSettings[k] = v
+            data.aimbot[k] = v
         end
-        print("  📝 " .. k .. " = " .. tostring(v))
+        print("  " .. k .. " = " .. tostring(v))
     end
     
-    -- Misc Settings
+    -- MISC
     for k, v in pairs(self._miscSettings) do
-        config.miscSettings[k] = v
+        data.misc[k] = v
     end
     
-    config.version = "1.0"
-    config.timestamp = os.time()
-    
-    SaveConfig(config)
-    print("✅ Config saved! Smoothness = " .. self._aimbotSettings.Smoothness)
-    self:ShowNotification("✅ Config Saved!", "Smoothness: " .. self._aimbotSettings.Smoothness)
+    -- Сохраняем
+    local success = SaveConfig(data)
+    if success then
+        print("✅ CONFIG SAVED! Smoothness = " .. self._aimbotSettings.Smoothness)
+    else
+        print("❌ SAVE FAILED!")
+    end
 end
 
 function UI:LoadConfig()
-    print("📂 Loading config...")
-    local config = LoadConfig()
-    if not config then
-        print("ℹ️ No config found, using defaults")
-        self:ShowNotification("ℹ️ No Config", "Using default settings")
+    print("📂 LOADING CONFIG...")
+    
+    local data = LoadConfig()
+    if not data then
+        print("ℹ️ No config found")
         return
     end
     
-    -- Функция для конвертации таблицы в Color3
-    local function tableToColor(t)
-        if t and t.R and t.G and t.B then
-            return Color3.new(t.R, t.G, t.B)
-        end
-        return nil
-    end
-    
     -- Загружаем ESP
-    if config.espSettings then
-        for k, v in pairs(config.espSettings) do
-            local color = tableToColor(v)
-            if color then
-                self._espSettings[k] = color
+    if data.esp then
+        for k, v in pairs(data.esp) do
+            if type(v) == "table" and v.r and v.g and v.b then
+                self._espSettings[k] = Color3.new(v.r, v.g, v.b)
             elseif self._espSettings[k] ~= nil then
                 self._espSettings[k] = v
             end
         end
     end
     
-    -- Загружаем Aimbot (включая Smoothness)
-    if config.aimbotSettings then
-        for k, v in pairs(config.aimbotSettings) do
-            local color = tableToColor(v)
-            if color then
-                self._aimbotSettings[k] = color
+    -- Загружаем AIMBOT (Smoothness обязательно загрузится)
+    if data.aimbot then
+        for k, v in pairs(data.aimbot) do
+            if type(v) == "table" and v.r and v.g and v.b then
+                self._aimbotSettings[k] = Color3.new(v.r, v.g, v.b)
             elseif self._aimbotSettings[k] ~= nil then
                 self._aimbotSettings[k] = v
             end
-            print("  📥 " .. k .. " = " .. tostring(v))
+            print("  " .. k .. " = " .. tostring(v))
         end
     end
     
-    -- Загружаем Misc
-    if config.miscSettings then
-        for k, v in pairs(config.miscSettings) do
+    -- Загружаем MISC
+    if data.misc then
+        for k, v in pairs(data.misc) do
             if self._miscSettings[k] ~= nil then
                 self._miscSettings[k] = v
             end
         end
     end
     
-    if config.espEnabled ~= nil then
-        self._espEnabled = config.espEnabled
+    if data.espEnabled ~= nil then
+        self._espEnabled = data.espEnabled
     end
     
-    print("✅ Config loaded! Smoothness = " .. self._aimbotSettings.Smoothness)
-    self:ShowNotification("✅ Config Loaded!", "Smoothness: " .. self._aimbotSettings.Smoothness)
+    print("✅ CONFIG LOADED! Smoothness = " .. self._aimbotSettings.Smoothness)
     
-    -- Применяем Fly если включен
+    -- Применяем Fly
     if self._miscSettings.FlyEnabled then
         self:ToggleFly(true)
     end
@@ -318,13 +303,10 @@ function UI:ResetDefaults()
     }
     
     self._espEnabled = false
-    
     if self._flyState.active then
         self:ToggleFly(false)
     end
-    
-    self:ShowNotification("🔄 Reset", "Settings reset to defaults!")
-    print("🔄 Settings reset to defaults!")
+    print("🔄 Reset to defaults!")
 end
 
 function UI:ShowNotification(title, message)
@@ -522,7 +504,7 @@ function UI:_switchTab(name)
 end
 
 -- ============================================
--- UI ЭЛЕМЕНТЫ
+-- UI ЭЛЕМЕНТЫ (ВСЕ ФУНКЦИИ)
 -- ============================================
 function UI:_createGroupbox(parent, title, pos, size)
     local groupbox = Instance.new("Frame")
@@ -1301,6 +1283,7 @@ function UI:_buildAimbotTab()
 
     self:_createSlider(aimGB, "Smoothness", 1, 50, self._aimbotSettings.Smoothness, function(v)
         self._aimbotSettings.Smoothness = v
+        print("🔄 Smoothness set to: " .. v)
     end)
 
     self:_createDropdown(aimGB, "Activation Key", {"MouseButton1", "MouseButton2", "MouseButton3", "Q", "E", "X", "C", "F", "R", "T", "V", "Z"}, self._aimbotSettings.ActivationKey, function(v)
@@ -1555,7 +1538,7 @@ function UI:_setupToggle()
 end
 
 -- ============================================
--- ESP
+-- ESP (ВСЕ ФУНКЦИИ)
 -- ============================================
 function UI:_isTeammate(player)
     if not player.Team or not LocalPlayer.Team then return false end
@@ -2334,7 +2317,9 @@ function UI:_isVisible(camera, part)
     if part.Parent then table.insert(ex, part.Parent) end
     rp.FilterDescendantsInstances = ex
     return Workspace:Raycast(origin, dir, rp) == nil
-end-- ============================================
+end
+
+-- ============================================
 -- MISC
 -- ============================================
 function UI:ToggleFly(enabled)
@@ -2516,9 +2501,9 @@ local blatantUI = UI.new()
 getgenv().BlatantUI = blatantUI
 
 print("=" .. string.rep("=", 50))
-print("✅ Blatant.cat loaded successfully!")
+print("✅ Blatant.cat loaded!")
 print("📌 F2 - Toggle Menu")
 print("📌 F3 - Save Config")
 print("📌 F4 - Load Config")
-print("📌 Config file: BlatantConfig.json")
+print("📌 Config: BlatantConfig.txt")
 print("=" .. string.rep("=", 50))
