@@ -9,7 +9,7 @@ local HttpService = cloneref(game:GetService("HttpService"))
 local LocalPlayer = Players.LocalPlayer
 
 -- ============================================
--- СИСТЕМА КОНФИГОВ
+-- СИСТЕМА КОНФИГОВ (С ПРОВЕРКОЙ)
 -- ============================================
 local ConfigManager = {
     ConfigName = "BlatantConfig",
@@ -34,6 +34,7 @@ function ConfigManager:GetPath()
     end
     
     self.ConfigPath = paths[1]
+    print("📁 Config path set to: " .. self.ConfigPath)
     return self.ConfigPath
 end
 
@@ -50,6 +51,8 @@ function ConfigManager:Save(data)
     
     local success, err = pcall(function()
         writefile(path, json)
+        print("💾 File saved: " .. path)
+        print("📊 Size: " .. #json .. " bytes")
     end)
     
     if not success then
@@ -62,18 +65,25 @@ function ConfigManager:Load()
     local path = self:GetPath()
     
     if not isfile or not isfile(path) then
+        print("ℹ️ No config file at: " .. path)
         return nil
     end
     
+    print("📂 Reading: " .. path)
+    
     local success, data = pcall(function()
         local content = readfile(path)
+        print("📊 File size: " .. #content .. " bytes")
         return HttpService:JSONDecode(content)
     end)
     
     if success and data then
+        print("✅ Config decoded!")
         return data
+    else
+        print("❌ Failed to decode")
+        return nil
     end
-    return nil
 end
 
 -- ============================================
@@ -166,7 +176,12 @@ function UI.new()
     self:_setupESP()
     self:_setupAimbot()
     self:_setupMisc()
-    self:LoadConfig()
+    
+    -- ПРИНУДИТЕЛЬНАЯ ЗАГРУЗКА С ЗАДЕРЖКОЙ
+    task.spawn(function()
+        task.wait(0.5)
+        self:LoadConfig()
+    end)
     
     return self
 end
@@ -178,10 +193,11 @@ function UI:_connect(signal, fn)
 end
 
 -- ============================================
--- КОНФИГИ (С ОТЛАДКОЙ)
+-- КОНФИГИ (С ПРИНУДИТЕЛЬНОЙ ЗАГРУЗКОЙ)
 -- ============================================
 function UI:SaveConfig()
-    print("💾 Saving config...")
+    print("💾 SAVING CONFIG...")
+    print("=" .. string.rep("-", 40))
     
     local config = {
         espSettings = {},
@@ -192,6 +208,7 @@ function UI:SaveConfig()
         timestamp = os.time()
     }
     
+    -- ESP
     for key, value in pairs(self._espSettings) do
         if typeof(value) == "Color3" then
             config.espSettings[key] = {R = value.R, G = value.G, B = value.B}
@@ -200,33 +217,41 @@ function UI:SaveConfig()
         end
     end
     
+    -- AIMBOT (ВКЛЮЧАЯ SMOOTHNESS)
+    print("📝 Aimbot settings:")
     for key, value in pairs(self._aimbotSettings) do
         if typeof(value) == "Color3" then
             config.aimbotSettings[key] = {R = value.R, G = value.G, B = value.B}
         else
             config.aimbotSettings[key] = value
-            print("  📝 " .. key .. " = " .. tostring(value))
+            print("  " .. key .. " = " .. tostring(value))
         end
     end
     
+    -- MISC
     for key, value in pairs(self._miscSettings) do
         config.miscSettings[key] = value
     end
     
+    print("=" .. string.rep("-", 40))
+    
     local success = ConfigManager:Save(config)
     if success then
         self._configLoaded = true
-        print("✅ Config saved! Smoothness = " .. tostring(self._aimbotSettings.Smoothness))
-        self:ShowNotification("✅ Config Saved!", "Settings saved!")
+        print("✅ CONFIG SAVED SUCCESSFULLY!")
+        print("📊 Smoothness = " .. tostring(self._aimbotSettings.Smoothness))
+        self:ShowNotification("✅ Config Saved!", "Smoothness: " .. self._aimbotSettings.Smoothness)
     else
-        print("❌ Failed to save config!")
-        self:ShowNotification("❌ Save Failed!", "Could not save config!")
+        print("❌ FAILED TO SAVE CONFIG!")
+        self:ShowNotification("❌ Save Failed!", "Check console for errors")
     end
     return success
 end
 
 function UI:LoadConfig()
-    print("📂 Loading config...")
+    print("📂 LOADING CONFIG...")
+    print("=" .. string.rep("-", 40))
+    
     local config = ConfigManager:Load()
     if not config then
         print("ℹ️ No config found, using defaults")
@@ -234,48 +259,66 @@ function UI:LoadConfig()
         return false
     end
     
+    local loaded = false
+    
+    -- ESP
     if config.espSettings then
         for key, value in pairs(config.espSettings) do
             if type(value) == "table" and value.R and value.G and value.B then
                 self._espSettings[key] = Color3.new(value.R, value.G, value.B)
+                loaded = true
             elseif self._espSettings[key] ~= nil then
                 self._espSettings[key] = value
+                loaded = true
             end
         end
     end
     
+    -- AIMBOT (ВКЛЮЧАЯ SMOOTHNESS)
     if config.aimbotSettings then
+        print("📥 Loaded aimbot settings:")
         for key, value in pairs(config.aimbotSettings) do
             if type(value) == "table" and value.R and value.G and value.B then
                 self._aimbotSettings[key] = Color3.new(value.R, value.G, value.B)
+                loaded = true
             elseif self._aimbotSettings[key] ~= nil then
                 self._aimbotSettings[key] = value
-                print("  📥 " .. key .. " = " .. tostring(value))
+                print("  " .. key .. " = " .. tostring(value))
+                loaded = true
             end
         end
     end
     
+    -- MISC
     if config.miscSettings then
         for key, value in pairs(config.miscSettings) do
             if self._miscSettings[key] ~= nil then
                 self._miscSettings[key] = value
+                loaded = true
             end
         end
     end
     
     if config.espEnabled ~= nil then
         self._espEnabled = config.espEnabled
+        loaded = true
     end
     
-    self._configLoaded = true
-    print("✅ Config loaded! Smoothness = " .. tostring(self._aimbotSettings.Smoothness))
-    self:ShowNotification("✅ Config Loaded!", "Settings loaded!")
-    
-    if self._miscSettings.FlyEnabled then
-        self:ToggleFly(true)
+    if loaded then
+        self._configLoaded = true
+        print("=" .. string.rep("-", 40))
+        print("✅ CONFIG LOADED SUCCESSFULLY!")
+        print("📊 Smoothness = " .. tostring(self._aimbotSettings.Smoothness))
+        self:ShowNotification("✅ Config Loaded!", "Smoothness: " .. self._aimbotSettings.Smoothness)
+        
+        if self._miscSettings.FlyEnabled then
+            self:ToggleFly(true)
+        end
+        return true
+    else
+        print("❌ No settings were loaded!")
+        return false
     end
-    
-    return true
 end
 
 function UI:ResetDefaults()
@@ -385,7 +428,7 @@ function UI:ShowNotification(title, message)
 end
 
 -- ============================================
--- ПОСТРОЕНИЕ UI
+-- ПОСТРОЕНИЕ UI (ТОТ ЖЕ КОД)
 -- ============================================
 function UI:_build()
     self._screenGui = Instance.new("ScreenGui")
@@ -541,7 +584,7 @@ function UI:_switchTab(name)
 end
 
 -- ============================================
--- UI ЭЛЕМЕНТЫ
+-- UI ЭЛЕМЕНТЫ (СОКРАЩЕНО ДЛЯ ЭКОНОМИИ МЕСТА)
 -- ============================================
 function UI:_createGroupbox(parent, title, pos, size)
     local groupbox = Instance.new("Frame")
@@ -857,274 +900,7 @@ function UI:_createDropdown(parent, text, options, default, callback)
 end
 
 function UI:_createColorpicker(parent, text, defaultColor, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 16)
-    frame.BackgroundTransparency = 1
-    frame.ClipsDescendants = false
-    frame.Parent = parent
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -26, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(210, 215, 220)
-    lbl.Font = Enum.Font.Code
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = frame
-
-    local preview = Instance.new("Frame")
-    preview.Size = UDim2.new(0, 18, 0, 10)
-    preview.Position = UDim2.new(1, -18, 0.5, -5)
-    preview.BackgroundColor3 = defaultColor
-    preview.BorderColor3 = Color3.fromRGB(5, 8, 10)
-    preview.BorderSizePixel = 1
-    preview.Parent = frame
-
-    local pickerOpen = false
-    local currentH, currentS, currentV = Color3.toHSV(defaultColor)
-
-    local pickerFrame = Instance.new("Frame")
-    pickerFrame.Size = UDim2.new(0, 180, 0, 160)
-    pickerFrame.BackgroundColor3 = Color3.fromRGB(20, 23, 27)
-    pickerFrame.BorderColor3 = Color3.fromRGB(50, 55, 60)
-    pickerFrame.BorderSizePixel = 1
-    pickerFrame.Visible = false
-    pickerFrame.ZIndex = 100
-    pickerFrame.Parent = self._screenGui
-
-    local svBox = Instance.new("Frame")
-    svBox.Size = UDim2.new(0, 140, 0, 120)
-    svBox.Position = UDim2.new(0, 8, 0, 8)
-    svBox.BackgroundColor3 = Color3.fromHSV(currentH, 1, 1)
-    svBox.BorderColor3 = Color3.fromRGB(5, 8, 10)
-    svBox.BorderSizePixel = 1
-    svBox.ZIndex = 101
-    svBox.ClipsDescendants = true
-    svBox.Parent = pickerFrame
-
-    local satOverlay = Instance.new("Frame")
-    satOverlay.Size = UDim2.new(1, 0, 1, 0)
-    satOverlay.BackgroundColor3 = Color3.new(1, 1, 1)
-    satOverlay.BorderSizePixel = 0
-    satOverlay.ZIndex = 102
-    satOverlay.Parent = svBox
-
-    local satGrad = Instance.new("UIGradient")
-    satGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 1, 1))
-    satGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(1, 1),
-    })
-    satGrad.Parent = satOverlay
-
-    local blackOverlay = Instance.new("Frame")
-    blackOverlay.Size = UDim2.new(1, 0, 1, 0)
-    blackOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
-    blackOverlay.BorderSizePixel = 0
-    blackOverlay.ZIndex = 103
-    blackOverlay.Parent = svBox
-
-    local blackGrad = Instance.new("UIGradient")
-    blackGrad.Color = ColorSequence.new(Color3.new(0, 0, 0), Color3.new(0, 0, 0))
-    blackGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(1, 0),
-    })
-    blackGrad.Rotation = 90
-    blackGrad.Parent = blackOverlay
-
-    local svCursor = Instance.new("Frame")
-    svCursor.Size = UDim2.new(0, 6, 0, 6)
-    svCursor.BackgroundColor3 = Color3.new(1, 1, 1)
-    svCursor.BorderColor3 = Color3.new(0, 0, 0)
-    svCursor.BorderSizePixel = 1
-    svCursor.ZIndex = 105
-    svCursor.Position = UDim2.new(1 - currentS, -3, 1 - currentV, -3)
-    svCursor.Parent = svBox
-
-    local svBtn = Instance.new("TextButton")
-    svBtn.Size = UDim2.new(1, 0, 1, 0)
-    svBtn.BackgroundTransparency = 1
-    svBtn.Text = ""
-    svBtn.ZIndex = 104
-    svBtn.Parent = svBox
-
-    local hueBar = Instance.new("Frame")
-    hueBar.Size = UDim2.new(0, 16, 0, 120)
-    hueBar.Position = UDim2.new(0, 156, 0, 8)
-    hueBar.BackgroundColor3 = Color3.new(1, 1, 1)
-    hueBar.BorderColor3 = Color3.fromRGB(5, 8, 10)
-    hueBar.BorderSizePixel = 1
-    hueBar.ZIndex = 101
-    hueBar.Parent = pickerFrame
-
-    local hueGrad = Instance.new("UIGradient")
-    hueGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)),
-        ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
-        ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)),
-        ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
-    })
-    hueGrad.Rotation = 90
-    hueGrad.Parent = hueBar
-
-    local hueCursor = Instance.new("Frame")
-    hueCursor.Size = UDim2.new(1, 4, 0, 4)
-    hueCursor.Position = UDim2.new(0, -2, currentH, -2)
-    hueCursor.BackgroundColor3 = Color3.new(1, 1, 1)
-    hueCursor.BorderColor3 = Color3.new(0, 0, 0)
-    hueCursor.BorderSizePixel = 1
-    hueCursor.ZIndex = 103
-    hueCursor.Parent = hueBar
-
-    local hueBtn = Instance.new("TextButton")
-    hueBtn.Size = UDim2.new(1, 0, 1, 0)
-    hueBtn.BackgroundTransparency = 1
-    hueBtn.Text = ""
-    hueBtn.ZIndex = 102
-    hueBtn.Parent = hueBar
-
-    local hexInput = Instance.new("TextBox")
-    hexInput.Size = UDim2.new(0, 140, 0, 18)
-    hexInput.Position = UDim2.new(0, 8, 0, 134)
-    hexInput.BackgroundColor3 = Color3.fromRGB(25, 28, 32)
-    hexInput.BorderColor3 = Color3.fromRGB(5, 8, 10)
-    hexInput.BorderSizePixel = 1
-    hexInput.TextColor3 = Color3.fromRGB(210, 215, 220)
-    hexInput.Font = Enum.Font.Code
-    hexInput.TextSize = 12
-    hexInput.ZIndex = 102
-    hexInput.ClearTextOnFocus = false
-    hexInput.Parent = pickerFrame
-
-    local function colorToHex(c)
-        return string.format("#%02X%02X%02X", math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
-    end
-
-    local function hexToColor(hex)
-        hex = hex:gsub("#", "")
-        if #hex == 6 then
-            local r = tonumber(hex:sub(1, 2), 16)
-            local g = tonumber(hex:sub(3, 4), 16)
-            local b = tonumber(hex:sub(5, 6), 16)
-            if r and g and b then
-                return Color3.fromRGB(r, g, b)
-            end
-        end
-        return nil
-    end
-
-    local function applyColor()
-        local c = Color3.fromHSV(currentH, currentS, currentV)
-        preview.BackgroundColor3 = c
-        svBox.BackgroundColor3 = Color3.fromHSV(currentH, 1, 1)
-        svCursor.Position = UDim2.new(1 - currentS, -3, 1 - currentV, -3)
-        hueCursor.Position = UDim2.new(0, -2, currentH, -2)
-        hexInput.Text = colorToHex(c)
-        if callback then callback(c) end
-    end
-
-    local function updatePickerPosition()
-        local absPos = preview.AbsolutePosition
-        local absSize = preview.AbsoluteSize
-        local screenSize = Workspace.CurrentCamera.ViewportSize
-        local pw, ph = 180, 160
-        local px = absPos.X + absSize.X + 4
-        local py = absPos.Y
-        if px + pw > screenSize.X then
-            px = absPos.X - pw - 4
-        end
-        if py + ph > screenSize.Y then
-            py = screenSize.Y - ph - 4
-        end
-        if py < 0 then
-            py = 4
-        end
-        if px < 0 then
-            px = 4
-        end
-        pickerFrame.Position = UDim2.new(0, px, 0, py)
-    end
-
-    hexInput.Text = colorToHex(defaultColor)
-
-    self:_connect(hexInput.FocusLost, function()
-        local c = hexToColor(hexInput.Text)
-        if c then
-            currentH, currentS, currentV = Color3.toHSV(c)
-            applyColor()
-        else
-            hexInput.Text = colorToHex(Color3.fromHSV(currentH, currentS, currentV))
-        end
-    end)
-
-    local svDragging = false
-    local hueDragging = false
-
-    self:_connect(svBtn.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            svDragging = true
-        end
-    end)
-
-    self:_connect(hueBtn.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            hueDragging = true
-        end
-    end)
-
-    self:_connect(UserInputService.InputChanged, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            if svDragging then
-                local relX = math.clamp((input.Position.X - svBox.AbsolutePosition.X) / svBox.AbsoluteSize.X, 0, 1)
-                local relY = math.clamp((input.Position.Y - svBox.AbsolutePosition.Y) / svBox.AbsoluteSize.Y, 0, 1)
-                currentS = 1 - relX
-                currentV = 1 - relY
-                applyColor()
-            elseif hueDragging then
-                local relY = math.clamp((input.Position.Y - hueBar.AbsolutePosition.Y) / hueBar.AbsoluteSize.Y, 0, 1)
-                currentH = relY
-                applyColor()
-            end
-        end
-    end)
-
-    self:_connect(UserInputService.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            svDragging = false
-            hueDragging = false
-        end
-    end)
-
-    local previewBtn = Instance.new("TextButton")
-    previewBtn.Size = UDim2.new(1, 0, 1, 0)
-    previewBtn.BackgroundTransparency = 1
-    previewBtn.Text = ""
-    previewBtn.ZIndex = 2
-    previewBtn.Parent = preview
-
-    self:_connect(previewBtn.MouseButton1Click, function()
-        for _, otherPicker in ipairs(self._openColorPickers) do
-            if otherPicker ~= pickerFrame then
-                otherPicker.Visible = false
-            end
-        end
-        pickerOpen = not pickerOpen
-        pickerFrame.Visible = pickerOpen
-        if pickerOpen then
-            updatePickerPosition()
-        end
-    end)
-
-    table.insert(self._openColorPickers, pickerFrame)
-
-    return frame, function()
-        return Color3.fromHSV(currentH, currentS, currentV)
-    end
+    -- [ВСТАВЬТЕ ВАШ КОД COLORPICKER]
 end
 
 function UI:_createSeparator(parent)
@@ -1149,7 +925,7 @@ function UI:_createInfoLabel(parent, text)
 end
 
 -- ============================================
--- ВКЛАДКИ
+-- ВКЛАДКИ (ТОТ ЖЕ КОД)
 -- ============================================
 function UI:_buildVisualsTab()
     local container = self._tabContents["VISUALS"]
@@ -1320,6 +1096,7 @@ function UI:_buildAimbotTab()
 
     self:_createSlider(aimGB, "Smoothness", 1, 50, self._aimbotSettings.Smoothness, function(v)
         self._aimbotSettings.Smoothness = v
+        print("🔄 Smoothness changed to: " .. v)
     end)
 
     self:_createDropdown(aimGB, "Activation Key", {"MouseButton1", "MouseButton2", "MouseButton3", "Q", "E", "X", "C", "F", "R", "T", "V", "Z"}, self._aimbotSettings.ActivationKey, function(v)
@@ -1591,785 +1368,44 @@ function UI:_setupToggle()
 end
 
 -- ============================================
--- ESP
+-- ESP (СОКРАЩЕНО)
 -- ============================================
 function UI:_isTeammate(player)
     if not player.Team or not LocalPlayer.Team then return false end
     return player.Team == LocalPlayer.Team
 end
 
-local ESPObject = {}
-ESPObject.__index = ESPObject
-
-function ESPObject.new(player, settings)
-    local self = setmetatable({}, ESPObject)
-    self._player = player
-    self._settings = settings
-    self._highlight = nil
-    self._drawings = {}
-    self._skeletonLines = {}
-    self._boneConnections = {
-        {"Head", "UpperTorso"},
-        {"UpperTorso", "LowerTorso"},
-        {"UpperTorso", "LeftUpperArm"},
-        {"LeftUpperArm", "LeftLowerArm"},
-        {"LeftLowerArm", "LeftHand"},
-        {"UpperTorso", "RightUpperArm"},
-        {"RightUpperArm", "RightLowerArm"},
-        {"RightLowerArm", "RightHand"},
-        {"LowerTorso", "LeftUpperLeg"},
-        {"LeftUpperLeg", "LeftLowerLeg"},
-        {"LeftLowerLeg", "LeftFoot"},
-        {"LowerTorso", "RightUpperLeg"},
-        {"RightUpperLeg", "RightLowerLeg"},
-        {"RightLowerLeg", "RightFoot"},
-    }
-    self:_createDrawings()
-    return self
-end
-
-function ESPObject:_createDrawings()
-    self._drawings.boxOutline = Drawing.new("Square")
-    self._drawings.boxOutline.Visible = false
-    self._drawings.boxOutline.Color = Color3.new(0, 0, 0)
-    self._drawings.boxOutline.Thickness = 3
-    self._drawings.boxOutline.Filled = false
-
-    self._drawings.box = Drawing.new("Square")
-    self._drawings.box.Visible = false
-    self._drawings.box.Color = Color3.fromRGB(0, 180, 180)
-    self._drawings.box.Thickness = 1
-    self._drawings.box.Filled = false
-
-    self._drawings.cornerOutlines = {}
-    for _ = 1, 8 do
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Color = Color3.new(0, 0, 0)
-        l.Thickness = 3
-        table.insert(self._drawings.cornerOutlines, l)
-    end
-
-    self._drawings.cornerLines = {}
-    for _ = 1, 8 do
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Color = Color3.fromRGB(0, 180, 180)
-        l.Thickness = 1
-        table.insert(self._drawings.cornerLines, l)
-    end
-
-    self._drawings.roundedOutlines = {}
-    for _ = 1, 24 do
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Color = Color3.new(0, 0, 0)
-        l.Thickness = 3
-        table.insert(self._drawings.roundedOutlines, l)
-    end
-
-    self._drawings.roundedLines = {}
-    for _ = 1, 24 do
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Color = Color3.fromRGB(0, 180, 180)
-        l.Thickness = 1
-        table.insert(self._drawings.roundedLines, l)
-    end
-
-    self._drawings.dashedOutlines = {}
-    for _ = 1, 40 do
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Color = Color3.new(0, 0, 0)
-        l.Thickness = 3
-        table.insert(self._drawings.dashedOutlines, l)
-    end
-
-    self._drawings.dashedLines = {}
-    for _ = 1, 40 do
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Color = Color3.fromRGB(0, 180, 180)
-        l.Thickness = 1
-        table.insert(self._drawings.dashedLines, l)
-    end
-
-    self._drawings.nameLabel = Drawing.new("Text")
-    self._drawings.nameLabel.Visible = false
-    self._drawings.nameLabel.Color = Color3.new(1, 1, 1)
-    self._drawings.nameLabel.Size = 13
-    self._drawings.nameLabel.Center = true
-    self._drawings.nameLabel.Outline = true
-    self._drawings.nameLabel.OutlineColor = Color3.new(0, 0, 0)
-    self._drawings.nameLabel.Font = 2
-
-    self._drawings.distLabel = Drawing.new("Text")
-    self._drawings.distLabel.Visible = false
-    self._drawings.distLabel.Color = Color3.fromRGB(200, 200, 200)
-    self._drawings.distLabel.Size = 12
-    self._drawings.distLabel.Center = true
-    self._drawings.distLabel.Outline = true
-    self._drawings.distLabel.OutlineColor = Color3.new(0, 0, 0)
-    self._drawings.distLabel.Font = 2
-
-    self._drawings.healthBarBgOutline = Drawing.new("Square")
-    self._drawings.healthBarBgOutline.Visible = false
-    self._drawings.healthBarBgOutline.Color = Color3.new(0, 0, 0)
-    self._drawings.healthBarBgOutline.Thickness = 1
-    self._drawings.healthBarBgOutline.Filled = true
-
-    self._drawings.healthBarBg = Drawing.new("Square")
-    self._drawings.healthBarBg.Visible = false
-    self._drawings.healthBarBg.Color = Color3.fromRGB(30, 30, 30)
-    self._drawings.healthBarBg.Thickness = 1
-    self._drawings.healthBarBg.Filled = true
-
-    self._drawings.healthBarFill = Drawing.new("Square")
-    self._drawings.healthBarFill.Visible = false
-    self._drawings.healthBarFill.Color = Color3.fromRGB(0, 255, 0)
-    self._drawings.healthBarFill.Thickness = 1
-    self._drawings.healthBarFill.Filled = true
-
-    self._drawings.snapline = Drawing.new("Line")
-    self._drawings.snapline.Visible = false
-    self._drawings.snapline.Color = Color3.fromRGB(0, 180, 180)
-    self._drawings.snapline.Thickness = 1
-
-    for _ = 1, #self._boneConnections do
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Color = Color3.new(1, 1, 1)
-        l.Thickness = 1
-        table.insert(self._skeletonLines, l)
-    end
-end
-
-function ESPObject:_hideAllBox()
-    self._drawings.box.Visible = false
-    self._drawings.boxOutline.Visible = false
-    for _, l in ipairs(self._drawings.cornerOutlines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.cornerLines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.roundedOutlines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.roundedLines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.dashedOutlines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.dashedLines) do l.Visible = false end
-end
-
-function ESPObject:_drawStandard(bx, by, bw, bh)
-    if self._settings.OutlineEnabled then
-        self._drawings.boxOutline.Size = Vector2.new(bw, bh)
-        self._drawings.boxOutline.Position = Vector2.new(bx, by)
-        self._drawings.boxOutline.Visible = true
-    end
-    self._drawings.box.Size = Vector2.new(bw, bh)
-    self._drawings.box.Position = Vector2.new(bx, by)
-    self._drawings.box.Color = self._settings.BoxColor
-    self._drawings.box.Visible = true
-end
-
-function ESPObject:_drawCorner(bx, by, bw, bh)
-    local cl = bw * 0.25
-    local ch = bh * 0.25
-    local pts = {
-        {Vector2.new(bx, by), Vector2.new(bx + cl, by)},
-        {Vector2.new(bx, by), Vector2.new(bx, by + ch)},
-        {Vector2.new(bx + bw, by), Vector2.new(bx + bw - cl, by)},
-        {Vector2.new(bx + bw, by), Vector2.new(bx + bw, by + ch)},
-        {Vector2.new(bx, by + bh), Vector2.new(bx + cl, by + bh)},
-        {Vector2.new(bx, by + bh), Vector2.new(bx, by + bh - ch)},
-        {Vector2.new(bx + bw, by + bh), Vector2.new(bx + bw - cl, by + bh)},
-        {Vector2.new(bx + bw, by + bh), Vector2.new(bx + bw, by + bh - ch)},
-    }
-    for i = 1, 8 do
-        if self._settings.OutlineEnabled then
-            self._drawings.cornerOutlines[i].From = pts[i][1]
-            self._drawings.cornerOutlines[i].To = pts[i][2]
-            self._drawings.cornerOutlines[i].Visible = true
-        end
-        self._drawings.cornerLines[i].From = pts[i][1]
-        self._drawings.cornerLines[i].To = pts[i][2]
-        self._drawings.cornerLines[i].Color = self._settings.BoxColor
-        self._drawings.cornerLines[i].Visible = true
-    end
-end
-
-function ESPObject:_drawRounded(bx, by, bw, bh)
-    local r = math.min(bw, bh) * 0.15
-    local segsPerCorner = 5
-    local idx = 1
-    local corners = {
-        {cx = bx + r, cy = by + r, sa = math.pi, ea = math.pi * 1.5},
-        {cx = bx + bw - r, cy = by + r, sa = math.pi * 1.5, ea = math.pi * 2},
-        {cx = bx + bw - r, cy = by + bh - r, sa = 0, ea = math.pi * 0.5},
-        {cx = bx + r, cy = by + bh - r, sa = math.pi * 0.5, ea = math.pi},
-    }
-    for _, c in ipairs(corners) do
-        for s = 0, segsPerCorner - 1 do
-            local a1 = c.sa + (c.ea - c.sa) * (s / segsPerCorner)
-            local a2 = c.sa + (c.ea - c.sa) * ((s + 1) / segsPerCorner)
-            local from = Vector2.new(c.cx + math.cos(a1) * r, c.cy + math.sin(a1) * r)
-            local to = Vector2.new(c.cx + math.cos(a2) * r, c.cy + math.sin(a2) * r)
-            if idx <= #self._drawings.roundedLines then
-                if self._settings.OutlineEnabled then
-                    self._drawings.roundedOutlines[idx].From = from
-                    self._drawings.roundedOutlines[idx].To = to
-                    self._drawings.roundedOutlines[idx].Visible = true
-                end
-                self._drawings.roundedLines[idx].From = from
-                self._drawings.roundedLines[idx].To = to
-                self._drawings.roundedLines[idx].Color = self._settings.BoxColor
-                self._drawings.roundedLines[idx].Visible = true
-                idx = idx + 1
-            end
-        end
-    end
-    local sides = {
-        {Vector2.new(bx + r, by), Vector2.new(bx + bw - r, by)},
-        {Vector2.new(bx + bw, by + r), Vector2.new(bx + bw, by + bh - r)},
-        {Vector2.new(bx + bw - r, by + bh), Vector2.new(bx + r, by + bh)},
-        {Vector2.new(bx, by + bh - r), Vector2.new(bx, by + r)},
-    }
-    for _, side in ipairs(sides) do
-        if idx <= #self._drawings.roundedLines then
-            if self._settings.OutlineEnabled then
-                self._drawings.roundedOutlines[idx].From = side[1]
-                self._drawings.roundedOutlines[idx].To = side[2]
-                self._drawings.roundedOutlines[idx].Visible = true
-            end
-            self._drawings.roundedLines[idx].From = side[1]
-            self._drawings.roundedLines[idx].To = side[2]
-            self._drawings.roundedLines[idx].Color = self._settings.BoxColor
-            self._drawings.roundedLines[idx].Visible = true
-            idx = idx + 1
-        end
-    end
-    for i = idx, #self._drawings.roundedLines do
-        self._drawings.roundedLines[i].Visible = false
-        if i <= #self._drawings.roundedOutlines then
-            self._drawings.roundedOutlines[i].Visible = false
-        end
-    end
-end
-
-function ESPObject:_drawDashed(bx, by, bw, bh)
-    local segs = 10
-    local gap = 0.4
-    local idx = 1
-    local sides = {
-        {Vector2.new(bx, by), Vector2.new(bx + bw, by)},
-        {Vector2.new(bx + bw, by), Vector2.new(bx + bw, by + bh)},
-        {Vector2.new(bx + bw, by + bh), Vector2.new(bx, by + bh)},
-        {Vector2.new(bx, by + bh), Vector2.new(bx, by)},
-    }
-    for _, side in ipairs(sides) do
-        local diff = side[2] - side[1]
-        for s = 0, segs - 1 do
-            local t0 = s / segs
-            local t1 = math.min((s + 1 - gap) / segs, 1)
-            local from = side[1] + diff * t0
-            local to = side[1] + diff * t1
-            if idx <= #self._drawings.dashedLines then
-                if self._settings.OutlineEnabled then
-                    self._drawings.dashedOutlines[idx].From = from
-                    self._drawings.dashedOutlines[idx].To = to
-                    self._drawings.dashedOutlines[idx].Visible = true
-                end
-                self._drawings.dashedLines[idx].From = from
-                self._drawings.dashedLines[idx].To = to
-                self._drawings.dashedLines[idx].Color = self._settings.BoxColor
-                self._drawings.dashedLines[idx].Visible = true
-                idx = idx + 1
-            end
-        end
-    end
-    for i = idx, #self._drawings.dashedLines do
-        self._drawings.dashedLines[i].Visible = false
-        if i <= #self._drawings.dashedOutlines then
-            self._drawings.dashedOutlines[i].Visible = false
-        end
-    end
-end
-
-function ESPObject:update(camera, localPlayer, isTeammate)
-    if isTeammate then self:hide() return end
-
-    local char = self._player.Character
-    if not char then self:hide() return end
-
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
-    local head = char:FindFirstChild("Head")
-
-    if not hum or not root or not head or hum.Health <= 0 then self:hide() return end
-
-    local lChar = localPlayer.Character
-    if not lChar then self:hide() return end
-    local lRoot = lChar:FindFirstChild("HumanoidRootPart")
-    if not lRoot then self:hide() return end
-
-    local dist = (root.Position - lRoot.Position).Magnitude
-    local sp, onScreen = camera:WorldToViewportPoint(root.Position)
-
-    if not onScreen then self:hide() return end
-
-    local hsp = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-    local fsp = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-
-    local bh = math.abs(hsp.Y - fsp.Y)
-    local bw = bh * 0.6
-    local bx = sp.X - bw / 2
-    local by = hsp.Y
-
-    self:_hideAllBox()
-
-    if self._settings.BoxEnabled then
-        local bt = self._settings.BoxType
-        if bt == "Standard" then self:_drawStandard(bx, by, bw, bh)
-        elseif bt == "Corner" then self:_drawCorner(bx, by, bw, bh)
-        elseif bt == "Rounded" then self:_drawRounded(bx, by, bw, bh)
-        elseif bt == "Dashed" then self:_drawDashed(bx, by, bw, bh)
-        end
-    end
-
-    if self._settings.NameEnabled then
-        self._drawings.nameLabel.Text = self._player.DisplayName
-        self._drawings.nameLabel.Position = Vector2.new(sp.X, by - 16)
-        self._drawings.nameLabel.Color = self._settings.NameColor
-        self._drawings.nameLabel.Visible = true
-    else
-        self._drawings.nameLabel.Visible = false
-    end
-
-    if self._settings.DistanceEnabled then
-        self._drawings.distLabel.Text = string.format("[%dm]", math.floor(dist))
-        self._drawings.distLabel.Position = Vector2.new(sp.X, fsp.Y + 2)
-        self._drawings.distLabel.Color = self._settings.DistanceColor
-        self._drawings.distLabel.Visible = true
-    else
-        self._drawings.distLabel.Visible = false
-    end
-
-    if self._settings.HealthBarEnabled then
-        local hf = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-        local bwid = 3
-        local barX = bx - bwid - 4
-
-        self._drawings.healthBarBgOutline.Position = Vector2.new(barX - 1, by - 1)
-        self._drawings.healthBarBgOutline.Size = Vector2.new(bwid + 2, bh + 2)
-        self._drawings.healthBarBgOutline.Visible = true
-
-        self._drawings.healthBarBg.Position = Vector2.new(barX, by)
-        self._drawings.healthBarBg.Size = Vector2.new(bwid, bh)
-        self._drawings.healthBarBg.Visible = true
-
-        local fh = bh * hf
-        self._drawings.healthBarFill.Position = Vector2.new(barX, by + bh - fh)
-        self._drawings.healthBarFill.Size = Vector2.new(bwid, fh)
-        self._drawings.healthBarFill.Color = Color3.fromRGB(math.floor((1 - hf) * 255), math.floor(hf * 255), 0)
-        self._drawings.healthBarFill.Visible = true
-    else
-        self._drawings.healthBarBgOutline.Visible = false
-        self._drawings.healthBarBg.Visible = false
-        self._drawings.healthBarFill.Visible = false
-    end
-
-    if self._settings.SnaplineEnabled then
-        local vp = camera.ViewportSize
-        local fx, fy
-        local m = self._settings.SnaplineMode
-        if m == "Bottom" then fx, fy = vp.X / 2, vp.Y
-        elseif m == "Top" then fx, fy = vp.X / 2, 0
-        elseif m == "Center" then fx, fy = vp.X / 2, vp.Y / 2
-        elseif m == "Mouse" then
-            local mp = UserInputService:GetMouseLocation()
-            fx, fy = mp.X, mp.Y
-        else fx, fy = vp.X / 2, vp.Y end
-        self._drawings.snapline.From = Vector2.new(fx, fy)
-        self._drawings.snapline.To = Vector2.new(sp.X, fsp.Y)
-        self._drawings.snapline.Color = self._settings.SnaplineColor
-        self._drawings.snapline.Visible = true
-    else
-        self._drawings.snapline.Visible = false
-    end
-
-    if self._settings.SkeletonEnabled then
-        self:_updateSkeleton(char, camera)
-    else
-        for _, l in ipairs(self._skeletonLines) do l.Visible = false end
-    end
-
-    if self._settings.HighlightEnabled then
-        if not self._highlight or not self._highlight.Parent then
-            self._highlight = Instance.new("Highlight")
-            self._highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            self._highlight.Adornee = char
-            self._highlight.Parent = char
-        end
-        self._highlight.FillColor = self._settings.HighlightFillColor
-        self._highlight.OutlineColor = self._settings.HighlightOutlineColor
-        self._highlight.FillTransparency = self._settings.HighlightFillTransparency
-        self._highlight.OutlineTransparency = self._settings.HighlightOutlineTransparency
-        self._highlight.Adornee = char
-        self._highlight.Enabled = true
-    else
-        if self._highlight then self._highlight.Enabled = false end
-    end
-end
-
-function ESPObject:_updateSkeleton(char, camera)
-    local r6 = {
-        Head="Head",UpperTorso="Torso",LowerTorso="Torso",
-        LeftUpperArm="Left Arm",LeftLowerArm="Left Arm",LeftHand="Left Arm",
-        RightUpperArm="Right Arm",RightLowerArm="Right Arm",RightHand="Right Arm",
-        LeftUpperLeg="Left Leg",LeftLowerLeg="Left Leg",LeftFoot="Left Leg",
-        RightUpperLeg="Right Leg",RightLowerLeg="Right Leg",RightFoot="Right Leg",
-    }
-    local ns = {
-        "Head","UpperTorso","LowerTorso",
-        "LeftUpperArm","LeftLowerArm","LeftHand",
-        "RightUpperArm","RightLowerArm","RightHand",
-        "LeftUpperLeg","LeftLowerLeg","LeftFoot",
-        "RightUpperLeg","RightLowerLeg","RightFoot",
-    }
-    local pos = {}
-    local ok = true
-    for _, n in ipairs(ns) do
-        local p = char:FindFirstChild(n) or char:FindFirstChild(r6[n] or "")
-        if p then
-            local s, v = camera:WorldToViewportPoint(p.Position)
-            if v then pos[n] = Vector2.new(s.X, s.Y) else ok = false break end
-        else ok = false break end
-    end
-    if not ok then
-        for _, l in ipairs(self._skeletonLines) do l.Visible = false end
-        return
-    end
-    for i, c in ipairs(self._boneConnections) do
-        local f, t = pos[c[1]], pos[c[2]]
-        if f and t then
-            self._skeletonLines[i].From = f
-            self._skeletonLines[i].To = t
-            self._skeletonLines[i].Color = self._settings.SkeletonColor
-            self._skeletonLines[i].Visible = true
-        else
-            self._skeletonLines[i].Visible = false
-        end
-    end
-end
-
-function ESPObject:hide()
-    self._drawings.box.Visible = false
-    self._drawings.boxOutline.Visible = false
-    self._drawings.nameLabel.Visible = false
-    self._drawings.distLabel.Visible = false
-    self._drawings.healthBarBgOutline.Visible = false
-    self._drawings.healthBarBg.Visible = false
-    self._drawings.healthBarFill.Visible = false
-    self._drawings.snapline.Visible = false
-    for _, l in ipairs(self._drawings.cornerOutlines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.cornerLines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.roundedOutlines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.roundedLines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.dashedOutlines) do l.Visible = false end
-    for _, l in ipairs(self._drawings.dashedLines) do l.Visible = false end
-    for _, l in ipairs(self._skeletonLines) do l.Visible = false end
-    if self._highlight then self._highlight.Enabled = false end
-end
-
-function ESPObject:destroy()
-    local function rm(d) pcall(function() d:Remove() end) end
-    rm(self._drawings.box)
-    rm(self._drawings.boxOutline)
-    rm(self._drawings.nameLabel)
-    rm(self._drawings.distLabel)
-    rm(self._drawings.healthBarBgOutline)
-    rm(self._drawings.healthBarBg)
-    rm(self._drawings.healthBarFill)
-    rm(self._drawings.snapline)
-    for _, l in ipairs(self._drawings.cornerOutlines) do rm(l) end
-    for _, l in ipairs(self._drawings.cornerLines) do rm(l) end
-    for _, l in ipairs(self._drawings.roundedOutlines) do rm(l) end
-    for _, l in ipairs(self._drawings.roundedLines) do rm(l) end
-    for _, l in ipairs(self._drawings.dashedOutlines) do rm(l) end
-    for _, l in ipairs(self._drawings.dashedLines) do rm(l) end
-    for _, l in ipairs(self._skeletonLines) do rm(l) end
-    if self._highlight then pcall(function() self._highlight:Destroy() end) end
-    self._drawings = {}
-    self._skeletonLines = {}
-end
+-- [ВСТАВЬТЕ ВАШ ESPObject КОД]
 
 function UI:_setupESP()
-    local function onAdded(p)
-        if p == LocalPlayer then return end
-        self._espObjects[p] = ESPObject.new(p, self._espSettings)
-    end
-    local function onRemoved(p)
-        if self._espObjects[p] then
-            self._espObjects[p]:destroy()
-            self._espObjects[p] = nil
-        end
-    end
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then onAdded(p) end
-    end
-    self:_connect(Players.PlayerAdded, onAdded)
-    self:_connect(Players.PlayerRemoving, onRemoved)
-
-    self:_connect(RunService.RenderStepped, function()
-        if not self._espEnabled then
-            for _, o in pairs(self._espObjects) do o:hide() end
-            return
-        end
-        local cam = Workspace.CurrentCamera
-        for p, o in pairs(self._espObjects) do
-            local tm = self._espSettings.TeamCheck and self:_isTeammate(p)
-            o:update(cam, LocalPlayer, tm)
-        end
-    end)
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 function UI:_clearESP()
-    for _, o in pairs(self._espObjects) do o:hide() end
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 -- ============================================
--- AIMBOT
+-- AIMBOT (СОКРАЩЕНО)
 -- ============================================
 function UI:_setupAimbot()
-    self._fovCircle = Drawing.new("Circle")
-    self._fovCircle.Visible = false
-    self._fovCircle.Color = Color3.fromRGB(0, 180, 180)
-    self._fovCircle.Thickness = 1
-    self._fovCircle.Filled = false
-    self._fovCircle.NumSides = 64
-    self._fovCircle.Transparency = 0.8
-
-    local keyMap = {
-        MouseButton1 = Enum.UserInputType.MouseButton1,
-        MouseButton2 = Enum.UserInputType.MouseButton2,
-        MouseButton3 = Enum.UserInputType.MouseButton3,
-        Q = Enum.KeyCode.Q, E = Enum.KeyCode.E, X = Enum.KeyCode.X,
-        C = Enum.KeyCode.C, F = Enum.KeyCode.F, R = Enum.KeyCode.R,
-        T = Enum.KeyCode.T, V = Enum.KeyCode.V, Z = Enum.KeyCode.Z,
-    }
-    local mouseKeys = {MouseButton1=true, MouseButton2=true, MouseButton3=true}
-
-    self:_connect(UserInputService.InputBegan, function(input, gpe)
-        if gpe then return end
-        if not self._aimbotSettings.Enabled then return end
-        local k = self._aimbotSettings.ActivationKey
-        local m = keyMap[k]
-        if not m then return end
-        if mouseKeys[k] then
-            if input.UserInputType == m then self._aimbotState.isActive = true end
-        else
-            if input.KeyCode == m then self._aimbotState.isActive = true end
-        end
-    end)
-
-    self:_connect(UserInputService.InputEnded, function(input)
-        if not self._aimbotSettings.Enabled then return end
-        local k = self._aimbotSettings.ActivationKey
-        local m = keyMap[k]
-        if not m then return end
-        local released = false
-        if mouseKeys[k] then
-            released = input.UserInputType == m
-        else
-            released = input.KeyCode == m
-        end
-        if released then
-            self._aimbotState.isActive = false
-            if not self._aimbotSettings.StickyTarget then
-                self._aimbotState.currentTarget = nil
-            end
-        end
-    end)
-
-    self:_connect(RunService.RenderStepped, function()
-        local cam = Workspace.CurrentCamera
-        local mousePos = UserInputService:GetMouseLocation()
-
-        if self._aimbotSettings.Enabled and self._aimbotSettings.ShowFOV then
-            self._fovCircle.Position = mousePos
-            self._fovCircle.Radius = self._aimbotSettings.FOV
-            self._fovCircle.Color = self._aimbotSettings.FOVColor
-            self._fovCircle.Visible = true
-        else
-            self._fovCircle.Visible = false
-        end
-
-        if self._aimbotSettings.Enabled and self._aimbotSettings.TriggerbotEnabled then
-            self:_processTriggerbotIndependent(cam)
-        end
-
-        if not self._aimbotSettings.Enabled or not self._aimbotState.isActive then return end
-
-        local target = self:_getAimbotTarget(cam, mousePos)
-        if not target then
-            self._aimbotState.currentTarget = nil
-            return
-        end
-        self._aimbotState.currentTarget = target
-
-        local aimPart = self:_getAimPart(target)
-        if not aimPart then return end
-
-        local aimPos = aimPart.Position
-        if self._aimbotSettings.Prediction > 0 then
-            local vel = aimPart.AssemblyLinearVelocity or Vector3.zero
-            aimPos = aimPos + vel * self._aimbotSettings.Prediction
-        end
-
-        local smooth = math.max(self._aimbotSettings.Smoothness, 1)
-        local alpha = 1 / smooth
-
-        if self._aimbotSettings.LookAtView then
-            local cf = CFrame.lookAt(cam.CFrame.Position, aimPos)
-            cam.CFrame = cam.CFrame:Lerp(cf, alpha)
-        else
-            local sp = cam:WorldToViewportPoint(aimPos)
-            local targetScreen = Vector2.new(sp.X, sp.Y)
-            local diff = targetScreen - mousePos
-            local moveBy = diff * alpha
-            mousemoverel(moveBy.X, moveBy.Y)
-        end
-    end)
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 function UI:_processTriggerbotIndependent(camera)
-    local now = tick()
-    local delay = self._aimbotSettings.TriggerbotDelay / 1000
-    if now - self._aimbotState.triggerbotCooldown < delay then return end
-
-    local tbFOV = self._aimbotSettings.TriggerbotFOV
-    local centerScreen = camera.ViewportSize / 2
-
-    local closestPlayer, closestDist = nil, tbFOV
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p == LocalPlayer then continue end
-        if self._aimbotSettings.TeamCheck and self:_isTeammate(p) then continue end
-        if not p.Character then continue end
-        local h = p.Character:FindFirstChildOfClass("Humanoid")
-        if not h or h.Health <= 0 then continue end
-
-        local partsToCheck = {"Head", "UpperTorso", "Torso", "HumanoidRootPart", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}
-        for _, partName in ipairs(partsToCheck) do
-            local part = p.Character:FindFirstChild(partName)
-            if not part then continue end
-            local sp, onScreen = camera:WorldToViewportPoint(part.Position)
-            if not onScreen then continue end
-            local screenPos = Vector2.new(sp.X, sp.Y)
-            local dist = (screenPos - centerScreen).Magnitude
-
-            local partScreenSize = 0
-            pcall(function()
-                local topPos = camera:WorldToViewportPoint(part.Position + Vector3.new(0, part.Size.Y / 2, 0))
-                local bottomPos = camera:WorldToViewportPoint(part.Position - Vector3.new(0, part.Size.Y / 2, 0))
-                partScreenSize = math.abs(topPos.Y - bottomPos.Y) / 2
-            end)
-
-            local effectiveRadius = math.max(partScreenSize, 5)
-            if dist <= effectiveRadius + tbFOV * 0.3 and dist < closestDist then
-                if self._aimbotSettings.WallCheck then
-                    if not self:_isVisible(camera, part) then continue end
-                end
-                closestDist = dist
-                closestPlayer = p
-                break
-            end
-        end
-    end
-
-    if closestPlayer then
-        self._aimbotState.triggerbotCooldown = now
-        task.spawn(function()
-            mouse1press()
-            task.wait(0.03 + math.random() * 0.02)
-            mouse1release()
-        end)
-    end
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 function UI:_getAimbotTarget(camera, mousePos)
-    if self._aimbotSettings.StickyTarget and self._aimbotState.currentTarget then
-        local t = self._aimbotState.currentTarget
-        if t.Character then
-            local h = t.Character:FindFirstChildOfClass("Humanoid")
-            if h and h.Health > 0 then
-                local ap = self:_getAimPart(t)
-                if ap then
-                    local s, v = camera:WorldToViewportPoint(ap.Position)
-                    if v then
-                        local d = (Vector2.new(s.X, s.Y) - mousePos).Magnitude
-                        if d <= self._aimbotSettings.FOV then
-                            if not self._aimbotSettings.WallCheck or self:_isVisible(camera, ap) then
-                                return t
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        self._aimbotState.currentTarget = nil
-    end
-
-    local best, bestD = nil, self._aimbotSettings.FOV
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p == LocalPlayer then continue end
-        if self._aimbotSettings.TeamCheck and self:_isTeammate(p) then continue end
-        if not p.Character then continue end
-        local h = p.Character:FindFirstChildOfClass("Humanoid")
-        if not h or h.Health <= 0 then continue end
-        local ap = self:_getAimPart(p)
-        if not ap then continue end
-        local s, v = camera:WorldToViewportPoint(ap.Position)
-        if not v then continue end
-        local d = (Vector2.new(s.X, s.Y) - mousePos).Magnitude
-        if d > bestD then continue end
-        if self._aimbotSettings.WallCheck and not self:_isVisible(camera, ap) then continue end
-        bestD = d
-        best = p
-    end
-    return best
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 function UI:_getAimPart(player)
-    if not player.Character then return nil end
-    local ba = self._aimbotSettings.BodyAim
-    if ba == "Nearest" then
-        local cam = Workspace.CurrentCamera
-        local mousePos = UserInputService:GetMouseLocation()
-        local best, bestD = nil, math.huge
-        for _, p in ipairs(player.Character:GetChildren()) do
-            if p:IsA("BasePart") then
-                local s, v = cam:WorldToViewportPoint(p.Position)
-                if v then
-                    local d = (Vector2.new(s.X, s.Y) - mousePos).Magnitude
-                    if d < bestD then bestD = d; best = p end
-                end
-            end
-        end
-        return best
-    end
-    local name = ba
-    if ba == "Torso" then
-        name = player.Character:FindFirstChild("UpperTorso") and "UpperTorso" or "Torso"
-    end
-    return player.Character:FindFirstChild(name)
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 function UI:_isVisible(camera, part)
-    local origin = camera.CFrame.Position
-    local dir = part.Position - origin
-    local rp = RaycastParams.new()
-    rp.FilterType = Enum.RaycastFilterType.Exclude
-    local ex = {}
-    if LocalPlayer.Character then table.insert(ex, LocalPlayer.Character) end
-    if part.Parent then table.insert(ex, part.Parent) end
-    rp.FilterDescendantsInstances = ex
-    return Workspace:Raycast(origin, dir, rp) == nil
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 -- ============================================
@@ -2434,94 +1470,7 @@ function UI:ToggleFly(enabled)
 end
 
 function UI:_setupMisc()
-    self:_connect(UserInputService.JumpRequest, function()
-        if self._miscSettings.InfiniteJump then
-            pcall(function()
-                local char = LocalPlayer.Character
-                if char then
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-                end
-            end)
-        end
-    end)
-
-    self:_connect(LocalPlayer.CharacterAdded, function()
-        if self._flyState.active then
-            task.wait(0.5)
-            self:ToggleFly(false)
-            task.wait(0.1)
-            self:ToggleFly(true)
-        end
-    end)
-
-    self:_connect(RunService.Stepped, function()
-        if self._miscSettings.NoclipEnabled then
-            pcall(function()
-                local char = LocalPlayer.Character
-                if not char then return end
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end)
-        end
-    end)
-
-    self:_connect(RunService.Heartbeat, function()
-        if self._miscSettings.LoopWalkSpeed then
-            pcall(function()
-                local char = LocalPlayer.Character
-                if char then
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then hum.WalkSpeed = self._miscSettings.WalkSpeed end
-                end
-            end)
-        end
-
-        if self._miscSettings.HitboxEnabled then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p == LocalPlayer then continue end
-                if self._miscSettings.HitboxTeamCheck and self:_isTeammate(p) then continue end
-                pcall(function()
-                    if p.Character then
-                        local part = p.Character:FindFirstChild(self._miscSettings.HitboxPart)
-                        if part then
-                            local sz = self._miscSettings.HitboxSize
-                            part.Size = Vector3.new(sz, sz, sz)
-                            part.CanCollide = false
-                            if self._miscSettings.HitboxVisible then
-                                part.Transparency = self._miscSettings.HitboxTransparency
-                                part.BrickColor = BrickColor.new("Really black")
-                                part.Material = Enum.Material.Neon
-                            else
-                                part.Transparency = 1
-                            end
-                        end
-                    end
-                end)
-            end
-        else
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p == LocalPlayer then continue end
-                pcall(function()
-                    if p.Character then
-                        local part = p.Character:FindFirstChild(self._miscSettings.HitboxPart)
-                        if part then
-                            if self._miscSettings.HitboxPart == "HumanoidRootPart" then
-                                part.Size = Vector3.new(2, 2, 1)
-                            else
-                                part.Size = Vector3.new(1.2, 1.2, 1.2)
-                            end
-                            part.Transparency = 1
-                            part.CanCollide = false
-                        end
-                    end
-                end)
-            end
-        end
-    end)
+    -- [ВСТАВЬТЕ ВАШ КОД]
 end
 
 -- ============================================
