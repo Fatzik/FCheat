@@ -9,7 +9,7 @@ local HttpService = cloneref(game:GetService("HttpService"))
 local LocalPlayer = Players.LocalPlayer
 
 -- ============================================
--- ПРОСТАЯ И НАДЕЖНАЯ СИСТЕМА КОНФИГОВ
+-- СИСТЕМА КОНФИГОВ
 -- ============================================
 local ConfigManager = {
     ConfigName = "BlatantConfig",
@@ -25,15 +25,14 @@ function ConfigManager:GetPath()
         self.ConfigName .. ".json"
     }
     
-    -- Проверяем существующие файлы
     for _, path in ipairs(paths) do
         if isfile and isfile(path) then
             self.ConfigPath = path
+            print("✅ Found config at: " .. path)
             return path
         end
     end
     
-    -- Если нет файла, используем первый путь
     self.ConfigPath = paths[1]
     return self.ConfigPath
 end
@@ -42,7 +41,6 @@ function ConfigManager:Save(data)
     local path = self:GetPath()
     local json = HttpService:JSONEncode(data)
     
-    -- Создаем папку
     if isfolder then
         local folder = path:match("(.+)/[^/]+$")
         if folder and not isfolder(folder) then
@@ -50,10 +48,13 @@ function ConfigManager:Save(data)
         end
     end
     
-    local success = pcall(function()
+    local success, err = pcall(function()
         writefile(path, json)
     end)
     
+    if not success then
+        print("❌ Save error: " .. tostring(err))
+    end
     return success
 end
 
@@ -93,7 +94,6 @@ function UI.new()
     self._openColorPickers = {}
     self._configLoaded = false
     
-    -- НАСТРОЙКИ ПО УМОЛЧАНИЮ
     self._espSettings = {
         BoxEnabled = false,
         BoxType = "Standard",
@@ -166,8 +166,6 @@ function UI.new()
     self:_setupESP()
     self:_setupAimbot()
     self:_setupMisc()
-    
-    -- ЗАГРУЗКА КОНФИГА
     self:LoadConfig()
     
     return self
@@ -180,18 +178,20 @@ function UI:_connect(signal, fn)
 end
 
 -- ============================================
--- РАБОТА С КОНФИГАМИ (ПРОСТО И НАДЕЖНО)
+-- КОНФИГИ (С ОТЛАДКОЙ)
 -- ============================================
 function UI:SaveConfig()
+    print("💾 Saving config...")
+    
     local config = {
         espSettings = {},
         aimbotSettings = {},
         miscSettings = {},
         espEnabled = self._espEnabled,
-        version = "1.0"
+        version = "1.0",
+        timestamp = os.time()
     }
     
-    -- Сохраняем ESP настройки
     for key, value in pairs(self._espSettings) do
         if typeof(value) == "Color3" then
             config.espSettings[key] = {R = value.R, G = value.G, B = value.B}
@@ -200,16 +200,15 @@ function UI:SaveConfig()
         end
     end
     
-    -- Сохраняем Aimbot настройки
     for key, value in pairs(self._aimbotSettings) do
         if typeof(value) == "Color3" then
             config.aimbotSettings[key] = {R = value.R, G = value.G, B = value.B}
         else
             config.aimbotSettings[key] = value
+            print("  📝 " .. key .. " = " .. tostring(value))
         end
     end
     
-    -- Сохраняем Misc настройки
     for key, value in pairs(self._miscSettings) do
         config.miscSettings[key] = value
     end
@@ -217,8 +216,8 @@ function UI:SaveConfig()
     local success = ConfigManager:Save(config)
     if success then
         self._configLoaded = true
-        print("✅ Config saved!")
-        self:ShowNotification("✅ Config Saved!", "Settings saved successfully!")
+        print("✅ Config saved! Smoothness = " .. tostring(self._aimbotSettings.Smoothness))
+        self:ShowNotification("✅ Config Saved!", "Settings saved!")
     else
         print("❌ Failed to save config!")
         self:ShowNotification("❌ Save Failed!", "Could not save config!")
@@ -227,6 +226,7 @@ function UI:SaveConfig()
 end
 
 function UI:LoadConfig()
+    print("📂 Loading config...")
     local config = ConfigManager:Load()
     if not config then
         print("ℹ️ No config found, using defaults")
@@ -234,7 +234,6 @@ function UI:LoadConfig()
         return false
     end
     
-    -- Загружаем ESP настройки
     if config.espSettings then
         for key, value in pairs(config.espSettings) do
             if type(value) == "table" and value.R and value.G and value.B then
@@ -245,18 +244,17 @@ function UI:LoadConfig()
         end
     end
     
-    -- Загружаем Aimbot настройки
     if config.aimbotSettings then
         for key, value in pairs(config.aimbotSettings) do
             if type(value) == "table" and value.R and value.G and value.B then
                 self._aimbotSettings[key] = Color3.new(value.R, value.G, value.B)
             elseif self._aimbotSettings[key] ~= nil then
                 self._aimbotSettings[key] = value
+                print("  📥 " .. key .. " = " .. tostring(value))
             end
         end
     end
     
-    -- Загружаем Misc настройки
     if config.miscSettings then
         for key, value in pairs(config.miscSettings) do
             if self._miscSettings[key] ~= nil then
@@ -265,16 +263,14 @@ function UI:LoadConfig()
         end
     end
     
-    -- Загружаем состояние ESP
     if config.espEnabled ~= nil then
         self._espEnabled = config.espEnabled
     end
     
     self._configLoaded = true
-    print("✅ Config loaded!")
-    self:ShowNotification("✅ Config Loaded!", "Settings loaded successfully!")
+    print("✅ Config loaded! Smoothness = " .. tostring(self._aimbotSettings.Smoothness))
+    self:ShowNotification("✅ Config Loaded!", "Settings loaded!")
     
-    -- Применяем настройки
     if self._miscSettings.FlyEnabled then
         self:ToggleFly(true)
     end
@@ -1506,7 +1502,6 @@ function UI:_buildInfoTab()
         end)
     end)
     
-    -- КОНФИГИ
     local configGB = self:_createGroupbox(container, "Config Management", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 0))
     configGB.AutomaticSize = Enum.AutomaticSize.Y
     
