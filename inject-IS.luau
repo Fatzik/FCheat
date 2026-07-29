@@ -35,32 +35,90 @@ Services.TweenService = getService("TweenService")
 local LocalPlayer = Services.Players.LocalPlayer
 
 -- ============================================
--- COLOR PALETTE
+-- COLOR PALETTE (MINECRAFT STYLE)
 -- ============================================
 local Colors = {
-    Background = Color3.fromRGB(12, 12, 18),
-    BackgroundLight = Color3.fromRGB(18, 18, 26),
-    BackgroundLighter = Color3.fromRGB(26, 26, 36),
-    BackgroundHover = Color3.fromRGB(32, 32, 46),
-    Border = Color3.fromRGB(45, 45, 65),
-    BorderLight = Color3.fromRGB(65, 65, 90),
-    Accent = Color3.fromRGB(88, 196, 255),
-    AccentLight = Color3.fromRGB(140, 215, 255),
-    AccentDark = Color3.fromRGB(55, 140, 210),
-    AccentGlow = Color3.fromRGB(60, 160, 230),
-    Purple = Color3.fromRGB(180, 100, 255),
-    PurpleLight = Color3.fromRGB(210, 140, 255),
-    Success = Color3.fromRGB(76, 210, 120),
-    Warning = Color3.fromRGB(255, 185, 65),
-    Danger = Color3.fromRGB(255, 85, 85),
+    Background = Color3.fromRGB(15, 15, 25),
+    BackgroundLight = Color3.fromRGB(25, 25, 35),
+    BackgroundLighter = Color3.fromRGB(35, 35, 45),
+    BackgroundHover = Color3.fromRGB(45, 45, 65),
+    Border = Color3.fromRGB(0, 0, 0),  -- Minecraft black borders
+    BorderLight = Color3.fromRGB(85, 85, 85),  -- Minecraft gray
+    Accent = Color3.fromRGB(0, 0, 0),  -- Black instead of yellow
+    AccentLight = Color3.fromRGB(50, 50, 50),
+    AccentDark = Color3.fromRGB(20, 20, 20),
+    AccentGlow = Color3.fromRGB(30, 30, 30),
+    Purple = Color3.fromRGB(170, 0, 255),
+    PurpleLight = Color3.fromRGB(210, 100, 255),
+    Success = Color3.fromRGB(85, 255, 85),  -- Minecraft green
+    Warning = Color3.fromRGB(255, 170, 0),  -- Minecraft gold/orange
+    Danger = Color3.fromRGB(255, 85, 85),  -- Minecraft red
     DangerLight = Color3.fromRGB(255, 120, 120),
-    Text = Color3.fromRGB(240, 242, 255),
-    TextSecondary = Color3.fromRGB(160, 168, 190),
-    TextMuted = Color3.fromRGB(95, 100, 120),
-    GradientStart = Color3.fromRGB(88, 196, 255),
-    GradientMid = Color3.fromRGB(140, 120, 255),
-    GradientEnd = Color3.fromRGB(200, 90, 255),
+    Text = Color3.fromRGB(255, 255, 255),  -- Minecraft white
+    TextSecondary = Color3.fromRGB(170, 170, 170),  -- Minecraft gray
+    TextMuted = Color3.fromRGB(85, 85, 85),
+    GradientStart = Color3.fromRGB(0, 0, 0),  -- Black instead of yellow
+    GradientMid = Color3.fromRGB(85, 255, 85),  -- Green
+    GradientEnd = Color3.fromRGB(85, 170, 255),  -- Blue
 }
+
+-- ============================================
+-- MINECRAFT FONT SYSTEM
+-- Blocky, pixelated Minecraft-style fonts
+-- ============================================
+local MinecraftFonts = {
+    -- Minecraft-style font mappings
+    Title = Enum.Font.GothamBlack,      -- Blocky for titles
+    Header = Enum.Font.GothamBold,      -- Bold headers
+    Body = Enum.Font.Gotham,            -- Regular text
+    Code = Enum.Font.SourceSansBold,    -- Pixelated for code
+    Pixel = Enum.Font.Arcade,           -- Very pixelated
+    Minecraft = Enum.Font.SourceSansBold, -- Main Minecraft-like
+}
+
+-- Helper function to apply Minecraft style to text elements
+local function applyMinecraftStyle(textElement, style, size)
+    style = style or "Minecraft"
+    
+    -- Set font based on style
+    textElement.Font = MinecraftFonts[style] or MinecraftFonts.Minecraft
+    
+    -- Adjust size for better Minecraft look
+    if not size then
+        if style == "Title" then
+            textElement.TextSize = 20
+        elseif style == "Header" then
+            textElement.TextSize = 16
+        elseif style == "Code" or style == "Pixel" then
+            textElement.TextSize = 14
+        else
+            textElement.TextSize = 14
+        end
+    end
+    
+    -- Add text stroke for blocky Minecraft effect
+    if not textElement:FindFirstChild("MinecraftStroke") then
+        local stroke = Instance.new("UIStroke")
+        stroke.Name = "MinecraftStroke"
+        stroke.Color = Color3.new(0, 0, 0)
+        stroke.Thickness = style == "Title" and 2 or 1
+        stroke.Transparency = 0.5
+        stroke.Parent = textElement
+    end
+    
+    -- Minecraft text coloring
+    if style == "Title" then
+        textElement.TextColor3 = Colors.Text
+    elseif style == "Header" then
+        textElement.TextColor3 = Colors.Accent
+    elseif style == "Code" then
+        textElement.TextColor3 = Colors.Success
+    else
+        textElement.TextColor3 = Colors.Text
+    end
+    
+    return textElement
+end
 
 -- ============================================
 -- ANIMATION SYSTEM (OPTIMIZED)
@@ -114,10 +172,12 @@ local ConfigData = {
         snaplineMode = "Bottom",
         teamCheck = false,
         boxColor = Color3.fromRGB(88, 196, 255),
+        outlineColor = Color3.fromRGB(0, 0, 0),
         nameColor = Color3.fromRGB(255, 255, 255),
         skeletonColor = Color3.fromRGB(255, 255, 255),
         snaplineColor = Color3.fromRGB(88, 196, 255),
         distanceColor = Color3.fromRGB(200, 200, 200),
+        healthBarColor = Color3.fromRGB(85, 255, 85),
         highlightFillColor = Color3.fromRGB(88, 196, 255),
         highlightOutlineColor = Color3.fromRGB(255, 255, 255),
         highlightFillTransparency = 0.75,
@@ -140,25 +200,7 @@ local ConfigData = {
         triggerbotDelay = 50,
         triggerbotFov = 30,
     },
-    misc = {
-        walkSpeed = 16,
-        loopWalkSpeed = false,
-        infiniteJump = false,
-        hitboxEnabled = false,
-        hitboxSize = 15,
-        hitboxTransparency = 0.9,
-        hitboxVisible = false,
-        hitboxPart = "HumanoidRootPart",
-        hitboxTeamCheck = false,
-        flyEnabled = false,
-        flySpeed = 50,
-        noclipEnabled = false,
-    },
-    render = {
-        buildingTextureEnabled = false,
-        textureColor1 = Color3.fromRGB(20, 20, 20),
-        textureColor2 = Color3.fromRGB(255, 140, 0),
-    },
+    misc = {},
 }
 
 local function colorToTable(c)
@@ -239,9 +281,10 @@ local function resetConfig()
         skeletonEnabled = false, healthBarEnabled = false, distanceEnabled = false,
         nameEnabled = false, highlightEnabled = false, snaplineEnabled = false,
         snaplineMode = "Bottom", teamCheck = false,
-        boxColor = Color3.fromRGB(88, 196, 255), nameColor = Color3.fromRGB(255, 255, 255),
-        skeletonColor = Color3.fromRGB(255, 255, 255), snaplineColor = Color3.fromRGB(88, 196, 255),
-        distanceColor = Color3.fromRGB(200, 200, 200), highlightFillColor = Color3.fromRGB(88, 196, 255),
+        boxColor = Color3.fromRGB(88, 196, 255), outlineColor = Color3.fromRGB(0, 0, 0),
+        nameColor = Color3.fromRGB(255, 255, 255), skeletonColor = Color3.fromRGB(255, 255, 255),
+        snaplineColor = Color3.fromRGB(88, 196, 255), distanceColor = Color3.fromRGB(200, 200, 200),
+        healthBarColor = Color3.fromRGB(85, 255, 85), highlightFillColor = Color3.fromRGB(88, 196, 255),
         highlightOutlineColor = Color3.fromRGB(255, 255, 255), highlightFillTransparency = 0.75,
         highlightOutlineTransparency = 0,
     }
@@ -251,17 +294,7 @@ local function resetConfig()
         activationKey = "MouseButton2", showFov = true, fovColor = Color3.fromRGB(88, 196, 255),
         triggerbotEnabled = false, triggerbotDelay = 50, triggerbotFov = 30,
     }
-    ConfigData.misc = {
-        walkSpeed = 16, loopWalkSpeed = false, infiniteJump = false, hitboxEnabled = false,
-        hitboxSize = 15, hitboxTransparency = 0.9, hitboxVisible = false,
-        hitboxPart = "HumanoidRootPart", hitboxTeamCheck = false, flyEnabled = false,
-        flySpeed = 50, noclipEnabled = false,
-    }
-    ConfigData.render = {
-        buildingTextureEnabled = false,
-        textureColor1 = Color3.fromRGB(20, 20, 20),
-        textureColor2 = Color3.fromRGB(255, 140, 0),
-    }
+    ConfigData.misc = {}
     print("🔄 [Config] Reset to defaults")
 end
 
@@ -277,7 +310,8 @@ function UI.new()
     self.visible = false  -- Menu starts hidden, will be shown on F2
     self.tabs = {}
     self.activeTab = nil
-    self.openDropdowns = {}
+    self.openDropdowns = {}   -- legacy, kept for compat
+    self.dropdownClosers = {} -- list of {isOpen, forceClose} per dropdown
     
     self:_createScreenGui()
     self:_createMainFrame()
@@ -308,10 +342,11 @@ function UI:_createScreenGui()
 end
 
 function UI:_createMainFrame()
+    -- Improved main frame styling
     self.mainFrame = Instance.new("Frame")
     self.mainFrame.Name = "MainFrame"
-    self.mainFrame.Size = UDim2.new(0, 660, 0, 510)
-    self.mainFrame.Position = UDim2.new(0.5, -330, 0.5, -255)
+    self.mainFrame.Size = UDim2.new(0, 720, 0, 540)
+    self.mainFrame.Position = UDim2.new(0.5, -360, 0.5, -270)
     self.mainFrame.BackgroundColor3 = Colors.Background
     self.mainFrame.BorderSizePixel = 0
     self.mainFrame.Visible = false
@@ -319,22 +354,22 @@ function UI:_createMainFrame()
     self.mainFrame.Parent = self.screenGui
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
+    corner.CornerRadius = UDim.new(0, 14)
     corner.Parent = self.mainFrame
 
     -- Subtle gradient overlay on the background
     local bgGradient = Instance.new("UIGradient")
     bgGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 14, 24)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 12, 18)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 16, 26)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 20)),
     })
     bgGradient.Rotation = 135
     bgGradient.Parent = self.mainFrame
 
-    -- Border glow stroke
+    -- Border stroke
     local stroke = Instance.new("UIStroke")
     stroke.Color = Colors.Border
-    stroke.Thickness = 1
+    stroke.Thickness = 1.5
     stroke.Transparency = 0
     stroke.Parent = self.mainFrame
 
@@ -342,12 +377,12 @@ function UI:_createMainFrame()
     local shadow = Instance.new("ImageLabel")
     shadow.AnchorPoint = Vector2.new(0.5, 0.5)
     shadow.BackgroundTransparency = 1
-    shadow.Position = UDim2.new(0.5, 0, 0.5, 6)
-    shadow.Size = UDim2.new(1, 50, 1, 50)
+    shadow.Position = UDim2.new(0.5, 0, 0.5, 8)
+    shadow.Size = UDim2.new(1, 60, 1, 60)
     shadow.ZIndex = -1
     shadow.Image = "rbxassetid://6014261993"
-    shadow.ImageColor3 = Colors.Accent
-    shadow.ImageTransparency = 0.92
+    shadow.ImageColor3 = Colors.TextMuted
+    shadow.ImageTransparency = 0.88
     shadow.ScaleType = Enum.ScaleType.Slice
     shadow.SliceCenter = Rect.new(49, 49, 450, 450)
     shadow.Parent = self.mainFrame
@@ -356,12 +391,12 @@ function UI:_createMainFrame()
     local shadowDark = Instance.new("ImageLabel")
     shadowDark.AnchorPoint = Vector2.new(0.5, 0.5)
     shadowDark.BackgroundTransparency = 1
-    shadowDark.Position = UDim2.new(0.5, 0, 0.5, 10)
-    shadowDark.Size = UDim2.new(1, 70, 1, 70)
+    shadowDark.Position = UDim2.new(0.5, 0, 0.5, 12)
+    shadowDark.Size = UDim2.new(1, 80, 1, 80)
     shadowDark.ZIndex = -2
     shadowDark.Image = "rbxassetid://6014261993"
     shadowDark.ImageColor3 = Color3.new(0, 0, 0)
-    shadowDark.ImageTransparency = 0.65
+    shadowDark.ImageTransparency = 0.7
     shadowDark.ScaleType = Enum.ScaleType.Slice
     shadowDark.SliceCenter = Rect.new(49, 49, 450, 450)
     shadowDark.Parent = self.mainFrame
@@ -377,8 +412,8 @@ function UI:AnimateOpen()
     if not self.mainFrame then return end
 
     -- Store the real center position
-    local centerPos = UDim2.new(0.5, -330, 0.5, -255)
-    local startPos  = UDim2.new(0.5, -330, 0.5, -230)  -- slightly above
+    local centerPos = UDim2.new(0.5, -360, 0.5, -270)
+    local startPos  = UDim2.new(0.5, -360, 0.5, -245)  -- slightly above
 
     self.mainFrame.Visible = true
     self.mainFrame.BackgroundTransparency = 1
@@ -387,8 +422,8 @@ function UI:AnimateOpen()
     local info = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     playTween(self.mainFrame, info, { BackgroundTransparency = 0, Position = centerPos })
     playTween(self.stroke,    info, { Transparency = 0 })
-    playTween(self.shadow,    info, { ImageTransparency = 0.92 })
-    playTween(self.shadowDark,info, { ImageTransparency = 0.65 })
+    playTween(self.shadow,    info, { ImageTransparency = 0.88 })
+    playTween(self.shadowDark,info, { ImageTransparency = 0.7 })
 
     -- Animate children group (header, tabbar, content) by fading in via CanvasGroupTransparency trick
     -- We fade all top-level children of mainFrame except shadow
@@ -420,7 +455,7 @@ function UI:AnimateClose(callback)
         return
     end
 
-    local endPos = UDim2.new(0.5, -330, 0.5, -280)
+    local endPos = UDim2.new(0.5, -360, 0.5, -310)
     local info   = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
     playTween(self.mainFrame,  info, { BackgroundTransparency = 1, Position = endPos })
@@ -569,17 +604,18 @@ function UI:_createHeader()
         end
     end)
 
-    -- Title
+    -- Title (Minecraft style)
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(0, 130, 1, 0)
     title.Position = UDim2.new(0, 32, 0, 0)
     title.BackgroundTransparency = 1
-    title.Text = "blatant.cat"
-    title.TextColor3 = Colors.Text
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 17
+    title.Text = "FCheat"
+    title.TextColor3 = Colors.Accent
+    title.Font = MinecraftFonts.Title
+    title.TextSize = 18
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = header
+    applyMinecraftStyle(title, "Title")
 
     -- Gradient on title text
     local titleGrad = Instance.new("UIGradient")
@@ -591,62 +627,60 @@ function UI:_createHeader()
     titleGrad.Parent = title
 
     local version = Instance.new("TextLabel")
-    version.Size = UDim2.new(0, 36, 0, 16)
-    version.Position = UDim2.new(0, 130, 0.5, -8)
-    version.BackgroundColor3 = Colors.AccentDark
-    version.BackgroundTransparency = 0.4
+    version.Size = UDim2.new(0, 40, 0, 18)
+    version.Position = UDim2.new(0, 130, 0.5, -9)
+    version.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    version.BackgroundTransparency = 0.2
+    version.BorderColor3 = Colors.Accent
+    version.BorderSizePixel = 2
     version.Text = "v2.0"
-    version.TextColor3 = Colors.AccentLight
-    version.Font = Enum.Font.GothamBold
+    version.TextColor3 = Colors.Accent
+    version.Font = MinecraftFonts.Pixel
     version.TextSize = 10
     version.Parent = header
-    local vCorner = Instance.new("UICorner")
-    vCorner.CornerRadius = UDim.new(0, 4)
-    vCorner.Parent = version
+    applyMinecraftStyle(version, "Code")
 
-    -- Minimize button
+    -- Minimize button (Minecraft style)
     local minBtn = Instance.new("TextButton")
-    minBtn.Size = UDim2.new(0, 26, 0, 26)
-    minBtn.Position = UDim2.new(1, -70, 0.5, -13)
-    minBtn.BackgroundColor3 = Colors.BackgroundLighter
-    minBtn.BorderSizePixel = 0
-    minBtn.Text = "−"
-    minBtn.TextColor3 = Colors.TextSecondary
-    minBtn.Font = Enum.Font.GothamBold
-    minBtn.TextSize = 16
+    minBtn.Size = UDim2.new(0, 28, 0, 28)
+    minBtn.Position = UDim2.new(1, -70, 0.5, -14)
+    minBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    minBtn.BorderColor3 = Colors.Warning
+    minBtn.BorderSizePixel = 2
+    minBtn.Text = "-"
+    minBtn.TextColor3 = Colors.Warning
+    minBtn.Font = MinecraftFonts.Title
+    minBtn.TextSize = 20
     minBtn.Parent = header
-    local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 6)
-    minCorner.Parent = minBtn
+    applyMinecraftStyle(minBtn, "Header")
     self:_connect(minBtn.MouseEnter, function()
-        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Warning, TextColor3 = Colors.Text})
+        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Warning, TextColor3 = Colors.Text, BorderColor3 = Colors.Text})
     end)
     self:_connect(minBtn.MouseLeave, function()
-        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundLighter, TextColor3 = Colors.TextSecondary})
+        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Color3.fromRGB(0,0,0), TextColor3 = Colors.Warning, BorderColor3 = Colors.Warning})
     end)
     self:_connect(minBtn.MouseButton1Click, function()
         self:SetVisible(false)
     end)
 
-    -- Close button
+    -- Close button (Minecraft style)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 26, 0, 26)
-    closeBtn.Position = UDim2.new(1, -36, 0.5, -13)
-    closeBtn.BackgroundColor3 = Colors.BackgroundLighter
-    closeBtn.BorderSizePixel = 0
-    closeBtn.Text = "×"
-    closeBtn.TextColor3 = Colors.TextSecondary
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
+    closeBtn.Size = UDim2.new(0, 28, 0, 28)
+    closeBtn.Position = UDim2.new(1, -36, 0.5, -14)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    closeBtn.BorderColor3 = Colors.Danger
+    closeBtn.BorderSizePixel = 2
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Colors.Danger
+    closeBtn.Font = MinecraftFonts.Title
+    closeBtn.TextSize = 18
     closeBtn.Parent = header
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 6)
-    closeCorner.Parent = closeBtn
+    applyMinecraftStyle(closeBtn, "Header")
     self:_connect(closeBtn.MouseEnter, function()
-        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Danger, TextColor3 = Colors.Text})
+        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Danger, TextColor3 = Colors.Text, BorderColor3 = Colors.Text})
     end)
     self:_connect(closeBtn.MouseLeave, function()
-        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundLighter, TextColor3 = Colors.TextSecondary})
+        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Color3.fromRGB(0,0,0), TextColor3 = Colors.Danger, BorderColor3 = Colors.Danger})
     end)
     self:_connect(closeBtn.MouseButton1Click, function()
         self:SetVisible(false)
@@ -656,14 +690,14 @@ end
 function UI:_createTabBar()
     local tabBar = Instance.new("Frame")
     tabBar.Name = "TabBar"
-    tabBar.Size = UDim2.new(1, -32, 0, 36)
-    tabBar.Position = UDim2.new(0, 16, 0, 58)
+    tabBar.Size = UDim2.new(1, -32, 0, 40)
+    tabBar.Position = UDim2.new(0, 16, 0, 62)
     tabBar.BackgroundColor3 = Colors.BackgroundLighter
     tabBar.BorderSizePixel = 0
     tabBar.Parent = self.mainFrame
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, 10)
     corner.Parent = tabBar
 
     local stroke = Instance.new("UIStroke")
@@ -673,8 +707,8 @@ function UI:_createTabBar()
     stroke.Parent = tabBar
 
     self.tabContainer = Instance.new("Frame")
-    self.tabContainer.Size = UDim2.new(1, -8, 1, 0)
-    self.tabContainer.Position = UDim2.new(0, 4, 0, 0)
+    self.tabContainer.Size = UDim2.new(1, -10, 1, 0)
+    self.tabContainer.Position = UDim2.new(0, 5, 0, 0)
     self.tabContainer.BackgroundTransparency = 1
     self.tabContainer.Parent = tabBar
 
@@ -682,69 +716,67 @@ function UI:_createTabBar()
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.VerticalAlignment = Enum.VerticalAlignment.Center
-    layout.Padding = UDim.new(0, 2)
+    layout.Padding = UDim.new(0, 4)
     layout.Parent = self.tabContainer
 end
 
 function UI:_createContentArea()
     self.contentArea = Instance.new("Frame")
     self.contentArea.Name = "ContentArea"
-    self.contentArea.Size = UDim2.new(1, -32, 1, -108)
-    self.contentArea.Position = UDim2.new(0, 16, 0, 100)
+    self.contentArea.Size = UDim2.new(1, -32, 1, -112)
+    self.contentArea.Position = UDim2.new(0, 16, 0, 108)
     self.contentArea.BackgroundTransparency = 1
     self.contentArea.Parent = self.mainFrame
 end
 
--- Tab icons map
+-- Tab icons map (improved Minecraft style symbols)
 local TAB_ICONS = {
-    VISUALS = "👁",
+    VISUALS = "👁️",
     AIMBOT  = "🎯",
-    MISC    = "⚙",
-    RENDER  = "🎨",
+    MISC    = "⚙️",
     CONFIG  = "💾",
 }
 
 function UI:AddTab(name)
     local icon = TAB_ICONS[name] or "•"
 
-    -- Outer wrapper (pill shape)
+    -- Outer wrapper (Minecraft square style)
     local btn = Instance.new("TextButton")
     btn.Name = name
     btn.Size = UDim2.new(0, 100, 1, -8)
-    btn.BackgroundColor3 = Colors.BackgroundLighter
+    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     btn.BackgroundTransparency = 1
+    btn.BorderColor3 = Colors.TextMuted
     btn.BorderSizePixel = 0
     btn.Text = ""
     btn.AutoButtonColor = false
     btn.Parent = self.tabContainer
 
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 6)
-    btnCorner.Parent = btn
-
-    -- Icon label
+    -- Icon label (Minecraft style)
     local iconLabel = Instance.new("TextLabel")
-    iconLabel.Size = UDim2.new(0, 20, 1, 0)
-    iconLabel.Position = UDim2.new(0, 8, 0, 0)
+    iconLabel.Size = UDim2.new(0, 24, 1, 0)
+    iconLabel.Position = UDim2.new(0, 6, 0, 0)
     iconLabel.BackgroundTransparency = 1
     iconLabel.Text = icon
     iconLabel.TextColor3 = Colors.TextMuted
-    iconLabel.Font = Enum.Font.Gotham
-    iconLabel.TextSize = 13
+    iconLabel.Font = MinecraftFonts.Pixel
+    iconLabel.TextSize = 12
     iconLabel.TextXAlignment = Enum.TextXAlignment.Left
     iconLabel.Parent = btn
+    applyMinecraftStyle(iconLabel, "Pixel")
 
-    -- Text label
+    -- Text label (Minecraft style)
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, -30, 1, 0)
     textLabel.Position = UDim2.new(0, 28, 0, 0)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = name
     textLabel.TextColor3 = Colors.TextMuted
-    textLabel.Font = Enum.Font.GothamSemibold
-    textLabel.TextSize = 11
+    textLabel.Font = MinecraftFonts.Header
+    textLabel.TextSize = 12
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.Parent = btn
+    applyMinecraftStyle(textLabel, "Header")
 
     -- Active indicator bar at bottom
     local indicator = Instance.new("Frame")
@@ -778,6 +810,13 @@ function UI:AddTab(name)
     content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     content.Visible = false
     content.Parent = self.contentArea
+
+    -- Close any open dropdown when the user scrolls this tab's content
+    self:_connect(content:GetPropertyChangedSignal("CanvasPosition"), function()
+        for _, closer in ipairs(self.dropdownClosers) do
+            closer.forceClose()
+        end
+    end)
 
     local listLayout = Instance.new("UIListLayout")
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -843,306 +882,66 @@ function UI:SetActiveTab(name)
     self.activeTab = name
 end
 
-function UI:AddSection(parent, title)
+function UI:AddSection(parent, title, accentColor)
     local section = Instance.new("Frame")
     section.Name = "Section_" .. title
-    section.Size = UDim2.new(1, -4, 0, 0)
-    section.BackgroundColor3 = Colors.BackgroundLight
-    section.BorderSizePixel = 0
+    section.Size = UDim2.new(1, 0, 0, 0)
+    section.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    section.BorderColor3 = accentColor or Colors.Accent
+    section.BorderSizePixel = 1
     section.AutomaticSize = Enum.AutomaticSize.Y
     section.Parent = parent
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = section
-
-    -- Subtle inner gradient (glass feel)
-    local sectionGrad = Instance.new("UIGradient")
-    sectionGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 22, 36)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(17, 17, 26)),
-    })
-    sectionGrad.Rotation = 120
-    sectionGrad.Parent = section
-
-    -- Border stroke
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Colors.Border
-    stroke.Thickness = 1
-    stroke.Transparency = 0.3
-    stroke.Parent = section
-
-    -- Gradient accent bar on the left (blue→purple)
+    -- Minecraft left accent bar
     local accentBar = Instance.new("Frame")
-    accentBar.Size = UDim2.new(0, 3, 1, -16)
-    accentBar.Position = UDim2.new(0, 0, 0, 8)
-    accentBar.BackgroundColor3 = Color3.new(1, 1, 1)
+    accentBar.Size = UDim2.new(0, 2, 1, 0)
+    accentBar.Position = UDim2.new(0, 0, 0, 0)
+    accentBar.BackgroundColor3 = accentColor or Colors.Accent
     accentBar.BorderSizePixel = 0
     accentBar.Parent = section
-    local accentCorner = Instance.new("UICorner")
-    accentCorner.CornerRadius = UDim.new(1, 0)
-    accentCorner.Parent = accentBar
-    local accentGrad = Instance.new("UIGradient")
-    accentGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Colors.GradientStart),
-        ColorSequenceKeypoint.new(1, Colors.GradientEnd),
-    })
-    accentGrad.Rotation = 90
-    accentGrad.Parent = accentBar
 
-    -- Section title
+    -- Section title (Minecraft style)
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -20, 0, 28)
-    titleLabel.Position = UDim2.new(0, 12, 0, 0)
+    titleLabel.Size = UDim2.new(1, -4, 0, 24)
+    titleLabel.Position = UDim2.new(0, 6, 0, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title:upper()
-    titleLabel.TextColor3 = Colors.TextSecondary
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 10
+    titleLabel.TextColor3 = Colors.Text
+    titleLabel.Font = MinecraftFonts.Header
+    titleLabel.TextSize = 12
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = section
+    -- Don't applyMinecraftStyle here as it overrides colors to black
 
     -- Separator line under title
     local sep = Instance.new("Frame")
-    sep.Size = UDim2.new(1, -16, 0, 1)
-    sep.Position = UDim2.new(0, 8, 0, 28)
-    sep.BackgroundColor3 = Color3.new(1, 1, 1)
+    sep.Size = UDim2.new(1, -8, 0, 1)
+    sep.Position = UDim2.new(0, 4, 0, 24)
+    sep.BackgroundColor3 = accentColor or Colors.Accent
+    sep.BackgroundTransparency = 0.6
     sep.BorderSizePixel = 0
     sep.Parent = section
-    local sepGrad = Instance.new("UIGradient")
-    sepGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0,   Color3.fromRGB(50, 50, 75)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(70, 70, 100)),
-        ColorSequenceKeypoint.new(1,   Color3.fromRGB(50, 50, 75)),
-    })
-    sepGrad.Parent = sep
 
     -- Items container
     local container = Instance.new("Frame")
     container.Name = "Container"
-    container.Size = UDim2.new(1, -16, 0, 0)
-    container.Position = UDim2.new(0, 8, 0, 32)
+    container.Size = UDim2.new(1, -6, 0, 0)
+    container.Position = UDim2.new(0, 3, 0, 28)
     container.BackgroundTransparency = 1
     container.AutomaticSize = Enum.AutomaticSize.Y
     container.Parent = section
 
     local layout = Instance.new("UIListLayout")
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 4)
+    layout.Padding = UDim.new(0, 2)
     layout.Parent = container
 
     local padding = Instance.new("UIPadding")
-    padding.PaddingBottom = UDim.new(0, 10)
+    padding.PaddingBottom = UDim.new(0, 8)
     padding.PaddingTop = UDim.new(0, 4)
     padding.Parent = container
 
     return container
-end
-
--- ============================================
--- UI ELEMENTS
--- ============================================
-
--- Keybind picker dialog
-function UI:CreateKeybindPicker(callback)
-    local overlay = Instance.new("Frame")
-    overlay.Name = "KeybindOverlay"
-    overlay.Size = UDim2.new(1, 0, 1, 0)
-    overlay.BackgroundColor3 = Color3.new(0, 0, 0)
-    overlay.BackgroundTransparency = 0.3
-    overlay.BorderSizePixel = 0
-    overlay.ZIndex = 500
-    overlay.Parent = self.screenGui
-    
-    local dialog = Instance.new("Frame")
-    dialog.Size = UDim2.new(0, 340, 0, 180)
-    dialog.Position = UDim2.new(0.5, -170, 0.5, -90)
-    dialog.BackgroundColor3 = Colors.BackgroundLight
-    dialog.BorderSizePixel = 0
-    dialog.ZIndex = 501
-    dialog.Parent = overlay
-    
-    local dialogCorner = Instance.new("UICorner")
-    dialogCorner.CornerRadius = UDim.new(0, 12)
-    dialogCorner.Parent = dialog
-    
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Colors.Accent
-    stroke.Thickness = 2
-    stroke.Parent = dialog
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -40, 0, 40)
-    title.Position = UDim2.new(0, 20, 0, 15)
-    title.BackgroundTransparency = 1
-    title.Text = "Press any key or mouse button..."
-    title.TextColor3 = Colors.Text
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 14
-    title.ZIndex = 502
-    title.Parent = dialog
-    
-    local subtitle = Instance.new("TextLabel")
-    subtitle.Size = UDim2.new(1, -40, 0, 30)
-    subtitle.Position = UDim2.new(0, 20, 0, 50)
-    subtitle.BackgroundTransparency = 1
-    subtitle.Text = "Supports: Keyboard keys, Mouse buttons (1-3)"
-    subtitle.TextColor3 = Colors.TextSecondary
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.TextSize = 11
-    subtitle.TextWrapped = true
-    subtitle.ZIndex = 502
-    subtitle.Parent = dialog
-    
-    local preview = Instance.new("TextLabel")
-    preview.Size = UDim2.new(1, -40, 0, 36)
-    preview.Position = UDim2.new(0, 20, 0, 90)
-    preview.BackgroundColor3 = Colors.BackgroundLighter
-    preview.BorderSizePixel = 0
-    preview.Text = "Waiting..."
-    preview.TextColor3 = Colors.Accent
-    preview.Font = Enum.Font.GothamBold
-    preview.TextSize = 16
-    preview.ZIndex = 502
-    preview.Parent = dialog
-    
-    local previewCorner = Instance.new("UICorner")
-    previewCorner.CornerRadius = UDim.new(0, 6)
-    previewCorner.Parent = preview
-    
-    local cancelBtn = Instance.new("TextButton")
-    cancelBtn.Size = UDim2.new(0, 120, 0, 32)
-    cancelBtn.Position = UDim2.new(0.5, -60, 1, -45)
-    cancelBtn.BackgroundColor3 = Colors.BackgroundLighter
-    cancelBtn.BorderSizePixel = 0
-    cancelBtn.Text = "Cancel (ESC)"
-    cancelBtn.TextColor3 = Colors.TextSecondary
-    cancelBtn.Font = Enum.Font.GothamSemibold
-    cancelBtn.TextSize = 11
-    cancelBtn.ZIndex = 502
-    cancelBtn.Parent = dialog
-    
-    local cancelCorner = Instance.new("UICorner")
-    cancelCorner.CornerRadius = UDim.new(0, 6)
-    cancelCorner.Parent = cancelBtn
-    
-    local function close()
-        overlay:Destroy()
-    end
-    
-    self:_connect(cancelBtn.MouseButton1Click, close)
-    
-    local conn1, conn2
-    
-    conn1 = Services.UserInputService.InputBegan:Connect(function(input, gpe)
-        if gpe then return end
-        
-        -- Cancel on Escape
-        if input.KeyCode == Enum.KeyCode.Escape then
-            close()
-            conn1:Disconnect()
-            if conn2 then conn2:Disconnect() end
-            return
-        end
-        
-        local keyName = nil
-        
-        -- Mouse buttons
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            keyName = "MouseButton1"
-        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-            keyName = "MouseButton2"
-        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-            keyName = "MouseButton3"
-        -- Keyboard keys
-        elseif input.KeyCode and input.KeyCode ~= Enum.KeyCode.Unknown then
-            keyName = input.KeyCode.Name
-        end
-        
-        if keyName and KEY_MAP[keyName] then
-            preview.Text = keyName
-            preview.TextColor3 = Colors.Success
-            task.wait(0.3)
-            close()
-            conn1:Disconnect()
-            if conn2 then conn2:Disconnect() end
-            if callback then callback(keyName) end
-        end
-    end)
-    
-    -- Animate in
-    dialog.Position = UDim2.new(0.5, -170, 0.5, -70)
-    dialog.BackgroundTransparency = 1
-    overlay.BackgroundTransparency = 1
-    
-    playTween(dialog, TweenInfo_Medium, {Position = UDim2.new(0.5, -170, 0.5, -90), BackgroundTransparency = 0})
-    playTween(overlay, TweenInfo_Fast, {BackgroundTransparency = 0.3})
-end
-
-function UI:CreateKeybindButton(parent, text, currentKey, callback)
-    local keybind = Instance.new("Frame")
-    keybind.Size = UDim2.new(1, 0, 0, 32)
-    keybind.BackgroundTransparency = 1
-    keybind.Parent = parent
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.55, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 12
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = keybind
-    
-    local keyDisplay = Instance.new("TextButton")
-    keyDisplay.Size = UDim2.new(0.42, 0, 0, 28)
-    keyDisplay.Position = UDim2.new(0.58, 0, 0.5, -14)
-    keyDisplay.BackgroundColor3 = Colors.BackgroundLighter
-    keyDisplay.BorderSizePixel = 0
-    keyDisplay.Text = currentKey or "None"
-    keyDisplay.TextColor3 = Colors.Accent
-    keyDisplay.Font = Enum.Font.GothamBold
-    keyDisplay.TextSize = 11
-    keyDisplay.AutoButtonColor = false
-    keyDisplay.Parent = keybind
-    
-    local keyCorner = Instance.new("UICorner")
-    keyCorner.CornerRadius = UDim.new(0, 5)
-    keyCorner.Parent = keyDisplay
-    
-    local keyStroke = Instance.new("UIStroke")
-    keyStroke.Color = Colors.Border
-    keyStroke.Thickness = 1
-    keyStroke.Transparency = 0.5
-    keyStroke.Parent = keyDisplay
-    
-    self:_connect(keyDisplay.MouseEnter, function()
-        playTween(keyDisplay, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundHover})
-        playTween(keyStroke, TweenInfo_Fast, {Color = Colors.Accent, Transparency = 0})
-    end)
-    
-    self:_connect(keyDisplay.MouseLeave, function()
-        playTween(keyDisplay, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundLighter})
-        playTween(keyStroke, TweenInfo_Fast, {Color = Colors.Border, Transparency = 0.5})
-    end)
-    
-    self:_connect(keyDisplay.MouseButton1Click, function()
-        keyDisplay.Text = "..."
-        self:CreateKeybindPicker(function(newKey)
-            keyDisplay.Text = newKey
-            if callback then callback(newKey) end
-        end)
-    end)
-    
-    return {
-        Set = function(_, key)
-            keyDisplay.Text = key or "None"
-        end,
-        Get = function()
-            return keyDisplay.Text ~= "None" and keyDisplay.Text or nil
-        end
-    }
 end
 
 -- ============================================
@@ -1166,10 +965,11 @@ function UI:CreateToggle(parent, text, default, callback)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggle
+    -- Don't applyMinecraftStyle - keeps text readable on dark background
 
     local switch = Instance.new("Frame")
     switch.Size = UDim2.new(0, 36, 0, 18)
@@ -1264,18 +1064,19 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = slider
+    -- Don't applyMinecraftStyle - keeps text readable on dark background
 
     local valueLabel = Instance.new("TextLabel")
     valueLabel.Size = UDim2.new(0.4, -6, 0, 18)
     valueLabel.Position = UDim2.new(0.6, 0, 0, 0)
     valueLabel.BackgroundTransparency = 1
     valueLabel.Text = tostring(default) .. suffix
-    valueLabel.TextColor3 = Colors.Accent
-    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.TextColor3 = Colors.AccentLight  -- Use lighter color instead of black
+    valueLabel.Font = MinecraftFonts.Header
     valueLabel.TextSize = 12
     valueLabel.TextXAlignment = Enum.TextXAlignment.Right
     valueLabel.Parent = slider
@@ -1392,11 +1193,12 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.ZIndex = 10
     label.Parent = dropdown
+    -- Don't applyMinecraftStyle - keeps text readable
 
     local box = Instance.new("Frame")
     box.Size = UDim2.new(1, 0, 0, 28)
@@ -1422,22 +1224,24 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     selected.BackgroundTransparency = 1
     selected.Text = default
     selected.TextColor3 = Colors.Text
-    selected.Font = Enum.Font.Gotham
+    selected.Font = MinecraftFonts.Minecraft
     selected.TextSize = 12
     selected.TextXAlignment = Enum.TextXAlignment.Left
     selected.ZIndex = 11
     selected.Parent = box
+    -- Don't applyMinecraftStyle - keeps text readable
 
     local arrow = Instance.new("TextLabel")
     arrow.Size = UDim2.new(0, 20, 1, 0)
     arrow.Position = UDim2.new(1, -22, 0, 0)
     arrow.BackgroundTransparency = 1
-    arrow.Text = "▼"
+    arrow.Text = "v"
     arrow.TextColor3 = Colors.Accent
-    arrow.Font = Enum.Font.GothamBold
+    arrow.Font = MinecraftFonts.Header
     arrow.TextSize = 10
     arrow.ZIndex = 11
     arrow.Parent = box
+    applyMinecraftStyle(arrow, "Header", 10)
 
     -- List is parented to ScreenGui to escape clipping
     local listHeight = math.min(#options, 6) * 28 + 8
@@ -1475,16 +1279,17 @@ function UI:CreateDropdown(parent, text, options, default, callback)
         local optBtn = Instance.new("TextButton")
         optBtn.Size = UDim2.new(1, -8, 0, 26)
         optBtn.BackgroundColor3 = Colors.BackgroundLighter
-        optBtn.BackgroundTransparency = 1
+        optBtn.BackgroundTransparency = 0.98
         optBtn.BorderSizePixel = 0
-        optBtn.Text = "  " .. opt
-        optBtn.TextColor3 = Colors.TextSecondary
-        optBtn.Font = Enum.Font.Gotham
+        optBtn.Text = "> " .. opt
+        optBtn.TextColor3 = Colors.Text
+        optBtn.Font = MinecraftFonts.Minecraft
         optBtn.TextSize = 12
         optBtn.TextXAlignment = Enum.TextXAlignment.Left
         optBtn.AutoButtonColor = false
         optBtn.ZIndex = 201
         optBtn.Parent = list
+        -- Don't applyMinecraftStyle - keeps text readable
 
         local optCorner = Instance.new("UICorner")
         optCorner.CornerRadius = UDim.new(0, 4)
@@ -1492,8 +1297,9 @@ function UI:CreateDropdown(parent, text, options, default, callback)
 
         self:_connect(optBtn.MouseButton1Click, function()
             selected.Text = opt
+            isOpen = false
             list.Visible = false
-            arrow.Text = "▼"
+            arrow.Text = "v"
             playTween(stroke, TweenInfo_Fast, {Color = Colors.Border})
             if callback then callback(opt) end
         end)
@@ -1511,24 +1317,31 @@ function UI:CreateDropdown(parent, text, options, default, callback)
 
     local isOpen = false
 
+    -- Instantly close this dropdown (no animation, used when scrolling)
+    local function forceClose()
+        if not isOpen then return end
+        isOpen = false
+        arrow.Text = "v"
+        pcall(function() playTween(stroke, TweenInfo_Fast, {Color = Colors.Border}) end)
+        list.Visible = false
+    end
+
     local function openList()
-        -- Close all others first
-        for _, other in ipairs(self.openDropdowns) do
-            if other ~= list then
-                other.Visible = false
+        -- Close every other dropdown immediately
+        for _, closer in ipairs(self.dropdownClosers) do
+            if closer.forceClose ~= forceClose then
+                closer.forceClose()
             end
         end
 
-        -- Position list absolutely using box's AbsolutePosition
+        -- Recompute absolute position every time (user may have scrolled)
         local absPos = box.AbsolutePosition
         local absSize = box.AbsoluteSize
-        list.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
         list.Size = UDim2.new(0, absSize.X, 0, listHeight)
-        list.Visible = true
-
-        -- Slide-in animation
         list.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y)
         list.BackgroundTransparency = 0.3
+        list.Visible = true
+
         playTween(list, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
             Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4),
             BackgroundTransparency = 0,
@@ -1561,7 +1374,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
 
     self:_connect(toggleBtn.MouseButton1Click, function()
         isOpen = not isOpen
-        arrow.Text = isOpen and "▲" or "▼"
+        arrow.Text = isOpen and "^" or "v"
         playTween(stroke, TweenInfo_Fast, {Color = isOpen and Colors.Accent or Colors.Border})
         if isOpen then
             openList()
@@ -1584,7 +1397,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
                       and mousePos.Y >= bp.Y and mousePos.Y <= bp.Y + bs.Y
             if not inList and not inBox then
                 isOpen = false
-                arrow.Text = "▼"
+                arrow.Text = "v"
                 playTween(stroke, TweenInfo_Fast, {Color = Colors.Border})
                 closeList()
             end
@@ -1592,38 +1405,58 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     end)
 
     table.insert(self.openDropdowns, list)
+    table.insert(self.dropdownClosers, {forceClose = forceClose})
 
     return {Set = function(_, v) selected.Text = v end, Get = function() return selected.Text end}
 end
 
-function UI:CreateColorPicker(parent, text, default, callback)
+-- ============================================
+-- SIMPLE COLOR PICKER
+-- ============================================
+function UI:CreateColorPicker(parent, text, default, category, key, callback)
     local picker = Instance.new("Frame")
-    picker.Size = UDim2.new(1, 0, 0, 26)
+    picker.Size = UDim2.new(1, 0, 0, 28)
     picker.BackgroundTransparency = 1
     picker.Parent = parent
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -50, 1, 0)
+    label.Position = UDim2.new(0, 6, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = picker
     
-    local preview = Instance.new("Frame")
-    preview.Size = UDim2.new(0, 40, 0, 18)
-    preview.Position = UDim2.new(1, -40, 0.5, -9)
-    preview.BackgroundColor3 = default
-    preview.BorderSizePixel = 0
-    preview.Parent = picker
+    local colorFrame = Instance.new("Frame")
+    colorFrame.Size = UDim2.new(0, 60, 1, -4)
+    colorFrame.Position = UDim2.new(1, -66, 0, 2)
+    colorFrame.BackgroundColor3 = default
+    colorFrame.BorderSizePixel = 0
+    colorFrame.Parent = picker
     
-    local previewCorner = Instance.new("UICorner")
-    previewCorner.CornerRadius = UDim.new(0, 4)
-    previewCorner.Parent = preview
+    local colorCorner = Instance.new("UICorner")
+    colorCorner.CornerRadius = UDim.new(0, 4)
+    colorCorner.Parent = colorFrame
     
-    local h, s, v = Color3.toHSV(default)
+    local colorStroke = Instance.new("UIStroke")
+    colorStroke.Color = Colors.Border
+    colorStroke.Thickness = 1
+    colorStroke.Parent = colorFrame
+    
+    -- RGB display
+    local rgbLabel = Instance.new("TextLabel")
+    rgbLabel.Size = UDim2.new(0, 50, 1, -4)
+    rgbLabel.Position = UDim2.new(1, -116, 0, 2)
+    rgbLabel.BackgroundTransparency = 1
+    rgbLabel.Text = string.format("R%d G%d B%d", math.floor(default.R*255), math.floor(default.G*255), math.floor(default.B*255))
+    rgbLabel.TextColor3 = Colors.TextMuted
+    rgbLabel.Font = MinecraftFonts.Code
+    rgbLabel.TextSize = 10
+    rgbLabel.TextXAlignment = Enum.TextXAlignment.Right
+    rgbLabel.Parent = picker
     
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 1, 0)
@@ -1631,23 +1464,304 @@ function UI:CreateColorPicker(parent, text, default, callback)
     btn.Text = ""
     btn.Parent = picker
     
-    self:_connect(btn.MouseButton1Click, function()
-        -- Simple color cycle for now (can be expanded to full picker)
-        h = (h + 0.1) % 1
-        local c = Color3.fromHSV(h, s, v)
-        preview.BackgroundColor3 = c
+    local function updateColorDisplay(c)
+        colorFrame.BackgroundColor3 = c
+        rgbLabel.Text = string.format("R%d G%d B%d", math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255))
+        if category and key then
+            ConfigData[category][key] = c
+        end
         if callback then callback(c) end
-    end)
+    end
     
-    return {Set = function(_, c) preview.BackgroundColor3 = c; h, s, v = Color3.toHSV(c) end, Get = function() return preview.BackgroundColor3 end}
+    local connections = {}
+    local function addConnection(conn)
+        table.insert(connections, conn)
+    end
+    
+    local isOpen = false
+    local pickerFrame = nil
+    local hSlider, sSlider, vSlider = nil, nil, nil
+    
+    local function createGradientColors(count)
+        local colors = {}
+        for i = 1, count do
+            local hue = (i - 1) / count
+            table.insert(colors, Color3.fromHSV(hue, 1, 1))
+        end
+        return colors
+    end
+    
+    local function openPicker()
+        if isOpen then return end
+        isOpen = true
+        
+        pickerFrame = Instance.new("Frame")
+        pickerFrame.Size = UDim2.new(0, 180, 0, 130)
+        pickerFrame.BackgroundColor3 = Colors.BackgroundLight
+        pickerFrame.BorderColor3 = Colors.Border
+        pickerFrame.BorderSizePixel = 1
+        pickerFrame.Position = UDim2.new(0, picker.AbsolutePosition.X, 0, picker.AbsolutePosition.Y + 28)
+        pickerFrame.ZIndex = 100
+        pickerFrame.Parent = self.screenGui
+        
+        local frameCorner = Instance.new("UICorner")
+        frameCorner.CornerRadius = UDim.new(0, 6)
+        frameCorner.Parent = pickerFrame
+        
+        -- Preview
+        local preview = Instance.new("Frame")
+        preview.Size = UDim2.new(1, -12, 0, 25)
+        preview.Position = UDim2.new(0, 6, 0, 6)
+        preview.BackgroundColor3 = colorFrame.BackgroundColor3
+        preview.BorderSizePixel = 0
+        preview.Parent = pickerFrame
+        
+        local previewCorner = Instance.new("UICorner")
+        previewCorner.CornerRadius = UDim.new(0, 4)
+        previewCorner.Parent = preview
+        
+        -- Hue slider with gradient
+        local hueContainer = Instance.new("Frame")
+        hueContainer.Size = UDim2.new(1, -12, 0, 20)
+        hueContainer.Position = UDim2.new(0, 6, 0, 36)
+        hueContainer.BackgroundTransparency = 1
+        hueContainer.Parent = pickerFrame
+        
+        local hueBg = Instance.new("Frame")
+        hueBg.Size = UDim2.new(1, 0, 0, 14)
+        hueBg.Position = UDim2.new(0, 0, 0, 3)
+        hueBg.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        hueBg.BorderSizePixel = 0
+        hueBg.Parent = hueContainer
+        
+        local hueCorner = Instance.new("UICorner")
+        hueCorner.CornerRadius = UDim.new(1, 0)
+        hueCorner.Parent = hueBg
+        
+        -- Create hue gradient using UIConstraint or multiple frames (simplified)
+        local hueGradient = Instance.new("UIGradient")
+        hueGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)),
+            ColorSequenceKeypoint.new(0.17, Color3.fromHSV(0.17, 1, 1)),
+            ColorSequenceKeypoint.new(0.33, Color3.fromHSV(0.33, 1, 1)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromHSV(0.5, 1, 1)),
+            ColorSequenceKeypoint.new(0.67, Color3.fromHSV(0.67, 1, 1)),
+            ColorSequenceKeypoint.new(0.83, Color3.fromHSV(0.83, 1, 1)),
+            ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1)),
+        })
+        hueGradient.Rotation = 0
+        hueGradient.Parent = hueBg
+        
+        local hueHandle = Instance.new("Frame")
+        hueHandle.Size = UDim2.new(0, 4, 0, 18)
+        hueHandle.AnchorPoint = Vector2.new(0.5, 0)
+        hueHandle.Position = UDim2.new(0.5, 0, 0, -2)
+        hueHandle.BackgroundColor3 = Colors.Text
+        hueHandle.BorderSizePixel = 0
+        hueHandle.Parent = hueContainer
+        
+        local handleCorner = Instance.new("UICorner")
+        handleCorner.CornerRadius = UDim.new(1, 0)
+        handleCorner.Parent = hueHandle
+        
+        -- Saturation/Value grid (simplified as SV slider)
+        local svContainer = Instance.new("Frame")
+        svContainer.Size = UDim2.new(1, -12, 0, 45)
+        svContainer.Position = UDim2.new(0, 6, 0, 62)
+        svContainer.BackgroundTransparency = 1
+        svContainer.Parent = pickerFrame
+        
+        local svBg = Instance.new("Frame")
+        svBg.Size = UDim2.new(1, 0, 0, 35)
+        svBg.Position = UDim2.new(0, 0, 0, 5)
+        svBg.BackgroundColor3 = Color3.fromHSV(0.5, 1, 1)
+        svBg.BorderSizePixel = 0
+        svBg.Parent = svContainer
+        
+        local svCorner = Instance.new("UICorner")
+        svCorner.CornerRadius = UDim.new(0, 4)
+        svCorner.Parent = svBg
+        
+        -- SV gradient overlay (white to transparent)
+        local svGradient1 = Instance.new("UIGradient")
+        svGradient1.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+        })
+        svGradient1.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 1),
+        })
+        svGradient1.Rotation = 90
+        svGradient1.Parent = svBg
+        
+        -- SV gradient overlay (black to transparent)
+        local svGradient2 = Instance.new("UIGradient")
+        svGradient2.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0)),
+        })
+        svGradient2.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(1, 0),
+        })
+        svGradient2.Rotation = 0
+        svGradient2.Parent = svBg
+        
+        local svHandle = Instance.new("Frame")
+        svHandle.Size = UDim2.new(0, 10, 0, 10)
+        svHandle.AnchorPoint = Vector2.new(0.5, 0.5)
+        svHandle.Position = UDim2.new(0.5, 0, 0.5, 0)
+        svHandle.BackgroundColor3 = Colors.Text
+        svHandle.BorderSizePixel = 0
+        svHandle.Parent = svBg
+        
+        local svHandleCorner = Instance.new("UICorner")
+        svHandleCorner.CornerRadius = UDim.new(1, 0)
+        svHandleCorner.Parent = svHandle
+        
+        local function updateColorFromSliders()
+            local hue = hueHandle.Position.X.Scale
+            local sat = svHandle.Position.X.Scale
+            local val = 1 - svHandle.Position.Y.Scale
+            local newColor = Color3.fromHSV(hue, sat, val)
+            updateColorDisplay(newColor)
+            preview.BackgroundColor3 = newColor
+        end
+        
+        local hueDragging = false
+        local svDragging = false
+        
+        local hueBtn = Instance.new("TextButton")
+        hueBtn.Size = UDim2.new(1, 0, 1, 0)
+        hueBtn.Position = UDim2.new(0, 0, 0, -2)
+        hueBtn.BackgroundTransparency = 1
+        hueBtn.Text = ""
+        hueBtn.Parent = hueContainer
+        
+        addConnection(hueBtn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                hueDragging = true
+            end
+        end))
+        
+        addConnection(hueBtn.InputChanged:Connect(function(input)
+            if hueDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local relX = (input.Position.X - hueBg.AbsolutePosition.X) / hueBg.AbsoluteSize.X
+                relX = math.clamp(relX, 0, 1)
+                hueHandle.Position = UDim2.new(relX, 0, 0, -2)
+                updateColorFromSliders()
+            end
+        end))
+        
+        addConnection(Services.UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                hueDragging = false
+                svDragging = false
+            end
+        end))
+        
+        local svBtn = Instance.new("TextButton")
+        svBtn.Size = UDim2.new(1, 0, 1, -10)
+        svBtn.Position = UDim2.new(0, 0, 0, 5)
+        svBtn.BackgroundTransparency = 1
+        svBtn.Text = ""
+        svBtn.Parent = svContainer
+        
+        addConnection(svBtn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                svDragging = true
+                local relX = (input.Position.X - svBg.AbsolutePosition.X) / svBg.AbsoluteSize.X
+                local relY = (input.Position.Y - svBg.AbsolutePosition.Y) / svBg.AbsoluteSize.Y
+                svHandle.Position = UDim2.new(math.clamp(relX, 0, 1), 0, math.clamp(relY, 0, 1), 0)
+                updateColorFromSliders()
+            end
+        end))
+        
+        addConnection(svBtn.InputChanged:Connect(function(input)
+            if svDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local relX = (input.Position.X - svBg.AbsolutePosition.X) / svBg.AbsoluteSize.X
+                local relY = (input.Position.Y - svBg.AbsolutePosition.Y) / svBg.AbsoluteSize.Y
+                svHandle.Position = UDim2.new(math.clamp(relX, 0, 1), 0, math.clamp(relY, 0, 1), 0)
+                updateColorFromSliders()
+            end
+        end))
+        
+        -- Close button
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(1, -12, 0, 20)
+        closeBtn.Position = UDim2.new(0, 6, 0, 106)
+        closeBtn.BackgroundColor3 = Colors.BackgroundLighter
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Text = "Close"
+        closeBtn.TextColor3 = Colors.TextSecondary
+        closeBtn.Font = MinecraftFonts.Minecraft
+        closeBtn.TextSize = 11
+        closeBtn.Parent = pickerFrame
+        
+        local closeCorner = Instance.new("UICorner")
+        closeCorner.CornerRadius = UDim.new(0, 4)
+        closeCorner.Parent = closeBtn
+        
+        addConnection(closeBtn.MouseEnter:Connect(function()
+            closeBtn.BackgroundColor3 = Colors.AccentDark
+        end))
+        
+        addConnection(closeBtn.MouseLeave:Connect(function()
+            closeBtn.BackgroundColor3 = Colors.BackgroundLighter
+        end))
+        
+        addConnection(closeBtn.MouseButton1Click:Connect(function()
+            isOpen = false
+            for _, conn in ipairs(connections) do pcall(function() conn:Disconnect() end) end
+            connections = {}
+            if pickerFrame then
+                pickerFrame:Destroy()
+                pickerFrame = nil
+            end
+        end))
+        
+        -- Close when clicking outside
+        local outsideConn
+        outsideConn = Services.UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local mousePos = Services.UserInputService:GetMouseLocation()
+                if pickerFrame then
+                    local lp = pickerFrame.AbsolutePosition
+                    local ls = pickerFrame.AbsoluteSize
+                    local inPicker = mousePos.X >= lp.X and mousePos.X <= lp.X + ls.X
+                               and mousePos.Y >= lp.Y and mousePos.Y <= lp.Y + ls.Y
+                    if not inPicker then
+                        isOpen = false
+                        outsideConn:Disconnect()
+                        for _, conn in ipairs(connections) do pcall(function() conn:Disconnect() end) end
+                        connections = {}
+                        pickerFrame:Destroy()
+                        pickerFrame = nil
+                    end
+                end
+            end
+        end)
+    end
+    
+    addConnection(btn.MouseButton1Click:Connect(openPicker))
+    
+    return {
+        Set = function(_, c)
+            updateColorDisplay(c)
+        end,
+        Get = function()
+            return colorFrame.BackgroundColor3
+        end
+    }
 end
 
 function UI:CreateButton(parent, text, callback, style)
     style = style or "default"
 
-    local baseColor   = style == "danger"  and Color3.fromRGB(50, 20, 20)
-                     or style == "success" and Color3.fromRGB(20, 50, 30)
-                     or Colors.BackgroundLighter
+    local baseColor   = style == "danger"  and Color3.fromRGB(50, 10, 10)
+                     or style == "success" and Color3.fromRGB(10, 50, 10)
+                     or Color3.fromRGB(20, 20, 20)
     local accentColor = style == "danger"  and Colors.Danger
                      or style == "success" and Colors.Success
                      or Colors.Accent
@@ -1655,39 +1769,29 @@ function UI:CreateButton(parent, text, callback, style)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, 0, 0, 30)
     button.BackgroundColor3 = baseColor
-    button.BorderSizePixel = 0
+    button.BorderColor3 = accentColor
+    button.BorderSizePixel = 2
     button.Text = ""
     button.AutoButtonColor = false
     button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = button
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = accentColor
-    stroke.Thickness = 1
-    stroke.Transparency = 0.7
-    stroke.Parent = button
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.GothamSemibold
-    label.TextSize = 12
+    label.Font = MinecraftFonts.Header
+    label.TextSize = 13
     label.Parent = button
+    applyMinecraftStyle(label, "Header", 13)
 
     self:_connect(button.MouseEnter, function()
-        playTween(button, TweenInfo_Fast, {BackgroundColor3 = accentColor})
+        playTween(button, TweenInfo_Fast, {BackgroundColor3 = accentColor, BorderColor3 = Colors.Text})
         playTween(label,  TweenInfo_Fast, {TextColor3 = Colors.Text})
-        playTween(stroke, TweenInfo_Fast, {Transparency = 0})
     end)
     self:_connect(button.MouseLeave, function()
-        playTween(button, TweenInfo_Fast, {BackgroundColor3 = baseColor})
+        playTween(button, TweenInfo_Fast, {BackgroundColor3 = baseColor, BorderColor3 = accentColor})
         playTween(label,  TweenInfo_Fast, {TextColor3 = Colors.TextSecondary})
-        playTween(stroke, TweenInfo_Fast, {Transparency = 0.7})
     end)
     self:_connect(button.MouseButton1Down, function()
         playTween(button, TweenInfo_Fast, {Size = UDim2.new(1, 0, 0, 27)})
@@ -1838,6 +1942,7 @@ function ESPObject:update(camera, localChar, settings)
         if settings.outlineEnabled then
             self.drawings.boxOutline.Size = Vector2.new(boxW, boxH)
             self.drawings.boxOutline.Position = Vector2.new(boxX, boxY)
+            self.drawings.boxOutline.Color = settings.outlineColor or Color3.new(0, 0, 0)
             self.drawings.boxOutline.Visible = true
         end
         self.drawings.box.Size = Vector2.new(boxW, boxH)
@@ -1883,7 +1988,12 @@ function ESPObject:update(camera, localChar, settings)
         local fillH = boxH * hf
         self.drawings.healthFill.Size = Vector2.new(barW, fillH)
         self.drawings.healthFill.Position = Vector2.new(barX, boxY + boxH - fillH)
-        self.drawings.healthFill.Color = Color3.fromRGB(255 - hf * 255, hf * 255, 0)
+        -- Use custom health bar color or gradient based on health
+        if settings.healthBarColor then
+            self.drawings.healthFill.Color = settings.healthBarColor
+        else
+            self.drawings.healthFill.Color = Color3.fromRGB(255 - hf * 255, hf * 255, 0)
+        end
         self.drawings.healthFill.Visible = true
     else
         self.drawings.healthBg.Visible = false
@@ -1985,21 +2095,9 @@ local KEY_MAP = {
     MouseButton1 = Enum.UserInputType.MouseButton1,
     MouseButton2 = Enum.UserInputType.MouseButton2,
     MouseButton3 = Enum.UserInputType.MouseButton3,
-    -- Keyboard keys
     Q = Enum.KeyCode.Q, E = Enum.KeyCode.E, X = Enum.KeyCode.X,
     C = Enum.KeyCode.C, F = Enum.KeyCode.F, R = Enum.KeyCode.R,
     T = Enum.KeyCode.T, V = Enum.KeyCode.V, Z = Enum.KeyCode.Z,
-    B = Enum.KeyCode.B, N = Enum.KeyCode.N, M = Enum.KeyCode.M,
-    G = Enum.KeyCode.G, H = Enum.KeyCode.H, Y = Enum.KeyCode.Y,
-    U = Enum.KeyCode.U, J = Enum.KeyCode.J, K = Enum.KeyCode.K,
-    L = Enum.KeyCode.L, P = Enum.KeyCode.P,
-    LeftShift = Enum.KeyCode.LeftShift,
-    LeftControl = Enum.KeyCode.LeftControl,
-    LeftAlt = Enum.KeyCode.LeftAlt,
-    RightShift = Enum.KeyCode.RightShift,
-    RightControl = Enum.KeyCode.RightControl,
-    Space = Enum.KeyCode.Space,
-    CapsLock = Enum.KeyCode.CapsLock,
 }
 
 local MOUSE_KEYS = {MouseButton1 = true, MouseButton2 = true, MouseButton3 = true}
@@ -2021,20 +2119,21 @@ function AimbotSystem.new()
 end
 
 function AimbotSystem:isTeammate(player)
-    if not player or player == LocalPlayer then return false end
     if not player.Team or not LocalPlayer.Team then return false end
     return player.Team == LocalPlayer.Team
 end
 
 function AimbotSystem:getAimPart(player, bodyAim)
     if not player.Character then return nil end
-    
+    local char = player.Character
+
+    -- "Nearest" mode: pick the part whose screen position is closest to the mouse
     if bodyAim == "Nearest" then
         local cam = Services.Workspace.CurrentCamera
         local mousePos = Services.UserInputService:GetMouseLocation()
         local best, bestDist = nil, math.huge
-        
-        for _, part in ipairs(player.Character:GetChildren()) do
+
+        for _, part in ipairs(char:GetChildren()) do
             if part:IsA("BasePart") then
                 local sp, onScreen = cam:WorldToViewportPoint(part.Position)
                 if onScreen then
@@ -2048,25 +2147,35 @@ function AimbotSystem:getAimPart(player, bodyAim)
         end
         return best
     end
-    
-    local partName = bodyAim
-    
-    -- Support both R6 and R15 body parts
-    if bodyAim == "Torso" then
-        partName = player.Character:FindFirstChild("UpperTorso") and "UpperTorso" or "Torso"
-    elseif bodyAim == "Neck" then
-        -- Neck is a Motor6D, not a part - aim for Head instead
-        return player.Character:FindFirstChild("Head")
+
+    -- R15 → R6 fallback map.
+    -- If a named R15 part is missing (R6 rig), use the equivalent R6 part.
+    local R6_FALLBACK = {
+        UpperTorso       = "Torso",
+        LowerTorso       = "Torso",
+        Neck             = "Torso",     -- R6 has no Neck part
+        LeftUpperArm     = "Left Arm",
+        LeftLowerArm     = "Left Arm",
+        LeftHand         = "Left Arm",
+        RightUpperArm    = "Right Arm",
+        RightLowerArm    = "Right Arm",
+        RightHand        = "Right Arm",
+        LeftUpperLeg     = "Left Leg",
+        LeftLowerLeg     = "Left Leg",
+        LeftFoot         = "Left Leg",
+        RightUpperLeg    = "Right Leg",
+        RightLowerLeg    = "Right Leg",
+        RightFoot        = "Right Leg",
+        -- R6 "Torso" alias keeps the old behaviour
+        Torso            = "Torso",
+    }
+
+    -- Try the exact name first; if missing, try the R6 fallback
+    local part = char:FindFirstChild(bodyAim)
+    if not part and R6_FALLBACK[bodyAim] then
+        part = char:FindFirstChild(R6_FALLBACK[bodyAim])
     end
-    
-    -- Try to find the part directly
-    local part = player.Character:FindFirstChild(partName)
-    if part and part:IsA("BasePart") then
-        return part
-    end
-    
-    -- Fallback to HumanoidRootPart if part not found
-    return player.Character:FindFirstChild("HumanoidRootPart")
+    return part
 end
 
 function AimbotSystem:isVisible(part)
@@ -2232,25 +2341,26 @@ end
 
 function AimbotSystem:handleInput(input, gpe, settings, isBegin)
     if not settings.enabled then return end
-    
+    if isBegin and gpe then return end
+
     local key = KEY_MAP[settings.activationKey]
     if not key then return end
-    
+
     local matched = false
     if MOUSE_KEYS[settings.activationKey] then
         matched = input.UserInputType == key
     else
         matched = input.KeyCode == key
     end
-    
-    if matched then
-        if isBegin and not gpe then
-            self.isActive = true
-        else
-            self.isActive = false
-            if not settings.stickyTarget then
-                self.currentTarget = nil
-            end
+
+    if not matched then return end
+
+    if isBegin then
+        self.isActive = true
+    else
+        self.isActive = false
+        if not settings.stickyTarget then
+            self.currentTarget = nil
         end
     end
 end
@@ -2260,110 +2370,17 @@ function AimbotSystem:destroy()
 end
 
 -- ============================================
--- MISC SYSTEM
+-- MISC SYSTEM (Empty - removed detection-prone features)
 -- ============================================
 local MiscSystem = {}
 MiscSystem.__index = MiscSystem
 
 function MiscSystem.new()
     local self = setmetatable({}, MiscSystem)
-    self.flyLoop = nil
-    self.noclipLoop = nil
-    self.originalTextures = {}  -- Store original textures for restoration
     return self
 end
 
-function MiscSystem:toggleFly(enabled, speed)
-    if enabled then
-        local char = LocalPlayer.Character
-        if not char then return end
-        
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        local head = char:FindFirstChild("Head")
-        if not hum or not head then return end
-        
-        hum.PlatformStand = true
-        head.Anchored = true
-        
-        self.flyLoop = Services.RunService.Heartbeat:Connect(function(dt)
-            local c = LocalPlayer.Character
-            if not c then return end
-            
-            local h = c:FindFirstChildOfClass("Humanoid")
-            local hd = c:FindFirstChild("Head")
-            if not h or not hd then return end
-            
-            local moveDir = h.MoveDirection * (speed * dt)
-            local headCF = hd.CFrame
-            local cam = Services.Workspace.CurrentCamera
-            local camCF = cam.CFrame
-            
-            local camOffset = headCF:ToObjectSpace(camCF).Position
-            camCF = camCF * CFrame.new(-camOffset.X, -camOffset.Y, -camOffset.Z + 1)
-            local camPos = camCF.Position
-            local headPos = headCF.Position
-            
-            local objSpaceVel = CFrame.new(camPos, Vector3.new(headPos.X, camPos.Y, headPos.Z)):VectorToObjectSpace(moveDir)
-            hd.CFrame = CFrame.new(headPos) * (camCF - camPos) * CFrame.new(objSpaceVel)
-        end)
-    else
-        if self.flyLoop then
-            self.flyLoop:Disconnect()
-            self.flyLoop = nil
-        end
-        
-        local char = LocalPlayer.Character
-        if char then
-            local head = char:FindFirstChild("Head")
-            if head then head.Anchored = false end
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.PlatformStand = false end
-        end
-    end
-end
-
-function MiscSystem:updateNoclip(enabled)
-    if not enabled then return end
-    
-    local char = LocalPlayer.Character
-    if not char then return end
-    
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-        end
-    end
-end
-
-function MiscSystem:updateHitbox(settings)
-    for _, player in ipairs(Services.Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-        if settings.teamCheck and player.Team == LocalPlayer.Team then continue end
-        if not player.Character then continue end
-        
-        local part = player.Character:FindFirstChild(settings.part)
-        if not part then continue end
-        
-        if settings.enabled then
-            part.Size = Vector3.new(settings.size, settings.size, settings.size)
-            part.CanCollide = false
-            
-            if settings.visible then
-                part.Transparency = settings.transparency
-                part.Material = Enum.Material.Neon
-            else
-                part.Transparency = 1
-            end
-        else
-            -- Reset to default
-            if settings.part == "HumanoidRootPart" then
-                part.Size = Vector3.new(2, 2, 1)
-            else
-                part.Size = Vector3.new(1.2, 1.2, 1.2)
-            end
-            part.Transparency = 1
-        end
-    end
+function MiscSystem:destroy()
 end
 
 function MiscSystem:updateWalkSpeed(speed, loop)
@@ -2378,71 +2395,8 @@ function MiscSystem:updateWalkSpeed(speed, loop)
     end
 end
 
-function MiscSystem:updateBuildingTextures(settings)
-    if not settings.enabled then
-        -- Restore original textures
-        for part, originalData in pairs(self.originalTextures) do
-            if part and part.Parent then
-                part.Material = originalData.Material
-                part.Color = originalData.Color
-                if originalData.Texture then
-                    part.Texture = originalData.Texture
-                end
-            end
-        end
-        self.originalTextures = {}
-        return
-    end
-    
-    -- Apply black/orange texture to building parts
-    local function applyTexture(part)
-        if not part:IsA("BasePart") then return end
-        
-        -- Skip character parts
-        if part:IsDescendantOf(LocalPlayer.Character or workspace) then
-            local char = part:FindFirstAncestorOfClass("Model")
-            if char and char:FindFirstChildOfClass("Humanoid") then
-                return
-            end
-        end
-        
-        -- Store original if not already stored
-        if not self.originalTextures[part] then
-            self.originalTextures[part] = {
-                Material = part.Material,
-                Color = part.Color,
-                Texture = part:FindFirstChildOfClass("Texture") or part:FindFirstChildOfClass("Decal")
-            }
-        end
-        
-        -- Apply alternating black/orange pattern
-        local hash = part:GetFullName():len() % 2
-        part.Color = hash == 0 and settings.color1 or settings.color2
-        part.Material = Enum.Material.SmoothPlastic
-    end
-    
-    -- Apply to all parts in workspace
-    for _, obj in ipairs(Services.Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            applyTexture(obj)
-        end
-    end
-end
-
 function MiscSystem:destroy()
-    if self.flyLoop then
-        self.flyLoop:Disconnect()
-    end
-    
-    -- Restore textures on destroy
-    for part, originalData in pairs(self.originalTextures) do
-        if part and part.Parent then
-            pcall(function()
-                part.Material = originalData.Material
-                part.Color = originalData.Color
-            end)
-        end
-    end
+    -- Cleanup noclip if active
 end
 
 -- ============================================
@@ -2481,12 +2435,10 @@ function App:_buildUI()
     -- Create tabs
     local visualsContent = self.ui:AddTab("VISUALS")
     local aimbotContent = self.ui:AddTab("AIMBOT")
-    local miscContent = self.ui:AddTab("MISC")
-    local renderContent = self.ui:AddTab("RENDER")
     local configContent = self.ui:AddTab("CONFIG")
     
     -- VISUALS TAB
-    local espGeneral = self.ui:AddSection(visualsContent, "ESP General")
+    local espGeneral = self.ui:AddSection(visualsContent, "ESP General", Colors.Accent)
     self.espToggle = self.ui:CreateToggle(espGeneral, "Enable ESP", ConfigData.esp.enabled, function(v) ConfigData.esp.enabled = v end)
     self.ui.boxToggle = self.ui:CreateToggle(espGeneral, "Box ESP", ConfigData.esp.boxEnabled, function(v) ConfigData.esp.boxEnabled = v end)
     self.ui.dropdownBoxType = self.ui:CreateDropdown(espGeneral, "Box Type", {"Standard", "Corner", "Rounded", "Dashed"}, ConfigData.esp.boxType, function(v) ConfigData.esp.boxType = v end)
@@ -2496,109 +2448,64 @@ function App:_buildUI()
     self.ui.healthBarToggle = self.ui:CreateToggle(espGeneral, "Health Bar", ConfigData.esp.healthBarEnabled, function(v) ConfigData.esp.healthBarEnabled = v end)
     self.ui:CreateToggle(espGeneral, "Team Check", ConfigData.esp.teamCheck, function(v) ConfigData.esp.teamCheck = v end)
     
-    local espVisual = self.ui:AddSection(visualsContent, "Visual Effects")
+    local espVisual = self.ui:AddSection(visualsContent, "Visual Effects", Colors.Accent)
     self.ui.skeletonToggle = self.ui:CreateToggle(espVisual, "Skeleton", ConfigData.esp.skeletonEnabled, function(v) ConfigData.esp.skeletonEnabled = v end)
-    self.ui.colorSkeletonColor = self.ui:CreateColorPicker(espVisual, "Skeleton Color", ConfigData.esp.skeletonColor, function(c) ConfigData.esp.skeletonColor = c end)
+    self.ui.colorSkeletonColor = self.ui:CreateColorPicker(espVisual, "Skeleton Color", ConfigData.esp.skeletonColor, "esp", "skeletonColor", function(c) ConfigData.esp.skeletonColor = c end)
     self.ui.highlightToggle = self.ui:CreateToggle(espVisual, "Highlight Chams", ConfigData.esp.highlightEnabled, function(v) ConfigData.esp.highlightEnabled = v end)
-    self.ui.colorHighlightColor = self.ui:CreateColorPicker(espVisual, "Fill Color", ConfigData.esp.highlightFillColor, function(c) ConfigData.esp.highlightFillColor = c end)
+    self.ui.colorHighlightColor = self.ui:CreateColorPicker(espVisual, "Fill Color", ConfigData.esp.highlightFillColor, "esp", "highlightFillColor", function(c) ConfigData.esp.highlightFillColor = c end)
     self.ui.sliderFillTransparency = self.ui:CreateSlider(espVisual, "Fill Transparency", 0, 100, ConfigData.esp.highlightFillTransparency * 100, function(v) ConfigData.esp.highlightFillTransparency = v / 100 end, "%")
     self.ui.snaplineToggle = self.ui:CreateToggle(espVisual, "Snaplines", ConfigData.esp.snaplineEnabled, function(v) ConfigData.esp.snaplineEnabled = v end)
     self.ui.dropdownSnaplineMode = self.ui:CreateDropdown(espVisual, "Snapline Origin", {"Bottom", "Center", "Top"}, ConfigData.esp.snaplineMode, function(v) ConfigData.esp.snaplineMode = v end)
     
+    -- ESP Colors section
+    local espColors = self.ui:AddSection(visualsContent, "Colors", Colors.Accent)
+    self.ui.colorBoxColor = self.ui:CreateColorPicker(espColors, "Box Color", ConfigData.esp.boxColor, "esp", "boxColor", function(c) ConfigData.esp.boxColor = c end)
+    self.ui.colorOutlineColor = self.ui:CreateColorPicker(espColors, "Outline Color", ConfigData.esp.outlineColor, "esp", "outlineColor", function(c) ConfigData.esp.outlineColor = c end)
+    self.ui.colorNameColor = self.ui:CreateColorPicker(espColors, "Name Color", ConfigData.esp.nameColor, "esp", "nameColor", function(c) ConfigData.esp.nameColor = c end)
+    self.ui.colorSnaplineColor = self.ui:CreateColorPicker(espColors, "Snapline Color", ConfigData.esp.snaplineColor, "esp", "snaplineColor", function(c) ConfigData.esp.snaplineColor = c end)
+    self.ui.colorDistanceColor = self.ui:CreateColorPicker(espColors, "Distance Color", ConfigData.esp.distanceColor, "esp", "distanceColor", function(c) ConfigData.esp.distanceColor = c end)
+    self.ui.colorHealthBarColor = self.ui:CreateColorPicker(espColors, "Health Bar Color", ConfigData.esp.healthBarColor, "esp", "healthBarColor", function(c) ConfigData.esp.healthBarColor = c end)
+    self.ui.colorHighlightOutlineColor = self.ui:CreateColorPicker(espColors, "Highlight Outline", ConfigData.esp.highlightOutlineColor, "esp", "highlightOutlineColor", function(c) ConfigData.esp.highlightOutlineColor = c end)
+    
     -- AIMBOT TAB
-    local aimGeneral = self.ui:AddSection(aimbotContent, "Aimbot Settings")
+    local aimGeneral = self.ui:AddSection(aimbotContent, "Aimbot Settings", Colors.Accent)
     self.aimbotToggle = self.ui:CreateToggle(aimGeneral, "Enable Aimbot", ConfigData.aimbot.enabled, function(v) ConfigData.aimbot.enabled = v end)
     self.ui.sliderFOV = self.ui:CreateSlider(aimGeneral, "FOV", 10, 500, ConfigData.aimbot.fov, function(v) ConfigData.aimbot.fov = v end, "px")
     self.ui.showFovToggle = self.ui:CreateToggle(aimGeneral, "Show FOV Circle", ConfigData.aimbot.showFov, function(v) ConfigData.aimbot.showFov = v end)
+    self.ui.colorFovColor = self.ui:CreateColorPicker(aimGeneral, "FOV Color", ConfigData.aimbot.fovColor, "aimbot", "fovColor", function(c) ConfigData.aimbot.fovColor = c end)
     self.ui.sliderSmoothness = self.ui:CreateSlider(aimGeneral, "Smoothness", 1, 50, ConfigData.aimbot.smoothness, function(v) ConfigData.aimbot.smoothness = v end)
+    self.ui.dropdownActivationKey = self.ui:CreateDropdown(aimGeneral, "Activation Key", {"MouseButton1", "MouseButton2", "MouseButton3", "Q", "E", "X", "C", "F"}, ConfigData.aimbot.activationKey, function(v) ConfigData.aimbot.activationKey = v end)
     
-    local aimKeybinds = self.ui:AddSection(aimbotContent, "Keybinds")
-    self.ui.keybindActivation = self.ui:CreateKeybindButton(aimKeybinds, "Activation Key", ConfigData.aimbot.activationKey, function(v) 
-        ConfigData.aimbot.activationKey = v 
-    end)
-    
-    local aimOptions = self.ui:AddSection(aimbotContent, "Options")
+    local aimOptions = self.ui:AddSection(aimbotContent, "Options", Colors.Accent)
     self.ui.dropdownBodyAim = self.ui:CreateDropdown(aimOptions, "Hitboxes", {"Head", "Neck", "UpperTorso", "LowerTorso", "Torso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg", "HumanoidRootPart", "Nearest"}, ConfigData.aimbot.bodyAim, function(v) ConfigData.aimbot.bodyAim = v end)
     self.ui:CreateToggle(aimOptions, "Wall Check", ConfigData.aimbot.wallCheck, function(v) ConfigData.aimbot.wallCheck = v end)
     self.ui:CreateToggle(aimOptions, "Team Check", ConfigData.aimbot.teamCheck, function(v) ConfigData.aimbot.teamCheck = v end)
     self.ui:CreateToggle(aimOptions, "Sticky Target", ConfigData.aimbot.stickyTarget, function(v) ConfigData.aimbot.stickyTarget = v end)
     self.ui.sliderPrediction = self.ui:CreateSlider(aimOptions, "Prediction", 0, 200, ConfigData.aimbot.prediction * 1000, function(v) ConfigData.aimbot.prediction = v / 1000 end, "ms")
     
-    local aimTrigger = self.ui:AddSection(aimbotContent, "Triggerbot")
+    local aimTrigger = self.ui:AddSection(aimbotContent, "Triggerbot", Colors.Accent)
     self.ui.triggerbotToggle = self.ui:CreateToggle(aimTrigger, "Enable Triggerbot", ConfigData.aimbot.triggerbotEnabled, function(v) ConfigData.aimbot.triggerbotEnabled = v end)
     self.ui.sliderTriggerbotDelay = self.ui:CreateSlider(aimTrigger, "Delay", 0, 500, ConfigData.aimbot.triggerbotDelay, function(v) ConfigData.aimbot.triggerbotDelay = v end, "ms")
     self.ui.sliderTriggerbotFOV = self.ui:CreateSlider(aimTrigger, "FOV", 5, 200, ConfigData.aimbot.triggerbotFov, function(v) ConfigData.aimbot.triggerbotFov = v end, "px")
     
-    -- MISC TAB
-    local miscMovement = self.ui:AddSection(miscContent, "Movement")
-    self.ui.sliderWalkSpeed = self.ui:CreateSlider(miscMovement, "Walk Speed", 16, 500, ConfigData.misc.walkSpeed, function(v)
-        ConfigData.misc.walkSpeed = v
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.WalkSpeed = v end
-        end
-    end)
-    self.ui:CreateToggle(miscMovement, "Loop WalkSpeed", ConfigData.misc.loopWalkSpeed, function(v)
-        ConfigData.misc.loopWalkSpeed = v
-    end)
-    self.ui:CreateToggle(miscMovement, "Infinite Jump", ConfigData.misc.infiniteJump, function(v)
-        ConfigData.misc.infiniteJump = v
-    end)
-    self.flyToggle = self.ui:CreateToggle(miscMovement, "Fly", ConfigData.misc.flyEnabled, function(v)
-        ConfigData.misc.flyEnabled = v
-        self.misc:toggleFly(v, ConfigData.misc.flySpeed)
-    end)
-    self.ui.sliderFlySpeed = self.ui:CreateSlider(miscMovement, "Fly Speed", 1, 300, ConfigData.misc.flySpeed, function(v)
-        ConfigData.misc.flySpeed = v
-        -- Update fly speed instantly if flying
-        if ConfigData.misc.flyEnabled then
-            self.misc:toggleFly(false)
-            self.misc:toggleFly(true, v)
-        end
-    end)
-    self.ui:CreateToggle(miscMovement, "Noclip", ConfigData.misc.noclipEnabled, function(v)
-        ConfigData.misc.noclipEnabled = v
-    end)
-    
-    local miscHitbox = self.ui:AddSection(miscContent, "Hitbox Expander")
-    self.hitboxToggle = self.ui:CreateToggle(miscHitbox, "Enable", ConfigData.misc.hitboxEnabled, function(v) ConfigData.misc.hitboxEnabled = v end)
-    self.ui.sliderHitboxSize = self.ui:CreateSlider(miscHitbox, "Size", 1, 50, ConfigData.misc.hitboxSize, function(v) ConfigData.misc.hitboxSize = v end)
-    self.ui.sliderHitboxTransparency = self.ui:CreateSlider(miscHitbox, "Transparency", 0, 100, ConfigData.misc.hitboxTransparency * 100, function(v) ConfigData.misc.hitboxTransparency = v / 100 end, "%")
-    self.ui:CreateToggle(miscHitbox, "Visible", ConfigData.misc.hitboxVisible, function(v) ConfigData.misc.hitboxVisible = v end)
-    self.ui.dropdownHitboxPart = self.ui:CreateDropdown(miscHitbox, "Target Part", {"HumanoidRootPart", "Head"}, ConfigData.misc.hitboxPart, function(v) ConfigData.misc.hitboxPart = v end)
-    self.ui:CreateToggle(miscHitbox, "Team Check", ConfigData.misc.hitboxTeamCheck, function(v) ConfigData.misc.hitboxTeamCheck = v end)
-    
-    -- RENDER TAB
-    local renderBuildings = self.ui:AddSection(renderContent, "Building Textures")
-    self.ui.renderBuildingToggle = self.ui:CreateToggle(renderBuildings, "Enable Texture Override", ConfigData.render.buildingTextureEnabled, function(v) 
-        ConfigData.render.buildingTextureEnabled = v 
-    end)
-    self.ui.colorTexture1 = self.ui:CreateColorPicker(renderBuildings, "Primary Color (Black)", ConfigData.render.textureColor1, function(c) 
-        ConfigData.render.textureColor1 = c 
-    end)
-    self.ui.colorTexture2 = self.ui:CreateColorPicker(renderBuildings, "Secondary Color (Orange)", ConfigData.render.textureColor2, function(c) 
-        ConfigData.render.textureColor2 = c 
-    end)
-    
     -- CONFIG TAB
-    local configActions = self.ui:AddSection(configContent, "Actions")
-    self.ui:CreateButton(configActions, "💾 Save Config", function()
+    local configActions = self.ui:AddSection(configContent, "Actions", Colors.Accent)
+    self.ui:CreateButton(configActions, "Save Config", function()
         saveConfig()
         self:notify("Config Saved", "Configuration saved successfully!")
     end, "success")
-    self.ui:CreateButton(configActions, "📂 Load Config", function()
+    self.ui:CreateButton(configActions, "Load Config", function()
         loadConfig()
         self:_applyConfig()
         self:notify("Config Loaded", "Configuration loaded successfully!")
     end)
-    self.ui:CreateButton(configActions, "🔄 Reset to Defaults", function()
+    self.ui:CreateButton(configActions, "Reset to Defaults", function()
         resetConfig()
         self:_applyConfig()
         self:notify("Config Reset", "Configuration reset to defaults!")
     end, "danger")
     
-    local configInfo = self.ui:AddSection(configContent, "Information")
+    local configInfo = self.ui:AddSection(configContent, "Information", Colors.Accent)
     local placeName = "Unknown"
     pcall(function() placeName = Services.MarketplaceService:GetProductInfo(game.PlaceId).Name end)
     
@@ -2622,14 +2529,9 @@ function App:_applyConfig()
     -- Apply toggles
     if self.espToggle then self.espToggle:Set(ConfigData.esp.enabled) end
     if self.aimbotToggle then self.aimbotToggle:Set(ConfigData.aimbot.enabled) end
-    if self.flyToggle then self.flyToggle:Set(ConfigData.misc.flyEnabled) end
-    if self.hitboxToggle then self.hitboxToggle:Set(ConfigData.misc.hitboxEnabled) end
     
     -- Apply sliders
     if self.ui.sliderWalkSpeed then self.ui.sliderWalkSpeed:Set(ConfigData.misc.walkSpeed) end
-    if self.ui.sliderFlySpeed then self.ui.sliderFlySpeed:Set(ConfigData.misc.flySpeed) end
-    if self.ui.sliderHitboxSize then self.ui.sliderHitboxSize:Set(ConfigData.misc.hitboxSize) end
-    if self.ui.sliderHitboxTransparency then self.ui.sliderHitboxTransparency:Set(ConfigData.misc.hitboxTransparency * 100) end
     if self.ui.sliderFOV then self.ui.sliderFOV:Set(ConfigData.aimbot.fov) end
     if self.ui.sliderSmoothness then self.ui.sliderSmoothness:Set(ConfigData.aimbot.smoothness) end
     if self.ui.sliderTriggerbotDelay then self.ui.sliderTriggerbotDelay:Set(ConfigData.aimbot.triggerbotDelay) end
@@ -2640,29 +2542,58 @@ function App:_applyConfig()
     -- Apply dropdowns
     if self.ui.dropdownBoxType then self.ui.dropdownBoxType:Set(ConfigData.esp.boxType) end
     if self.ui.dropdownSnaplineMode then self.ui.dropdownSnaplineMode:Set(ConfigData.esp.snaplineMode) end
+    if self.ui.dropdownActivationKey then self.ui.dropdownActivationKey:Set(ConfigData.aimbot.activationKey) end
     if self.ui.dropdownBodyAim then self.ui.dropdownBodyAim:Set(ConfigData.aimbot.bodyAim) end
     if self.ui.dropdownHitboxPart then self.ui.dropdownHitboxPart:Set(ConfigData.misc.hitboxPart) end
     
-    -- Apply keybinds
-    if self.ui.keybindActivation then self.ui.keybindActivation:Set(ConfigData.aimbot.activationKey) end
-    
-    -- Apply colors (need to update color picker preview)
-    -- Note: CreateColorPicker returns an object but doesn't have Set method yet
-    
     -- Apply colors
+    if self.ui.colorBoxColor then self.ui.colorBoxColor:Set(ConfigData.esp.boxColor) end
+    if self.ui.colorOutlineColor then self.ui.colorOutlineColor:Set(ConfigData.esp.outlineColor) end
+    if self.ui.colorNameColor then self.ui.colorNameColor:Set(ConfigData.esp.nameColor) end
+    if self.ui.colorSnaplineColor then self.ui.colorSnaplineColor:Set(ConfigData.esp.snaplineColor) end
+    if self.ui.colorDistanceColor then self.ui.colorDistanceColor:Set(ConfigData.esp.distanceColor) end
+    if self.ui.colorHealthBarColor then self.ui.colorHealthBarColor:Set(ConfigData.esp.healthBarColor) end
     if self.ui.colorSkeletonColor then self.ui.colorSkeletonColor:Set(ConfigData.esp.skeletonColor) end
     if self.ui.colorHighlightColor then self.ui.colorHighlightColor:Set(ConfigData.esp.highlightFillColor) end
-    if self.ui.colorTexture1 then self.ui.colorTexture1:Set(ConfigData.render.textureColor1) end
-    if self.ui.colorTexture2 then self.ui.colorTexture2:Set(ConfigData.render.textureColor2) end
+    if self.ui.colorHighlightOutlineColor then self.ui.colorHighlightOutlineColor:Set(ConfigData.esp.highlightOutlineColor) end
+    if self.ui.colorFovColor then self.ui.colorFovColor:Set(ConfigData.aimbot.fovColor) end
     
-    -- Apply fly state
-    if ConfigData.misc.flyEnabled then
-        self.misc:toggleFly(true, ConfigData.misc.flySpeed)
-    else
-        self.misc:toggleFly(false)
-    end
+    -- Apply sliders
+    if self.ui.sliderFOV then self.ui.sliderFOV:Set(ConfigData.aimbot.fov) end
+    if self.ui.sliderSmoothness then self.ui.sliderSmoothness:Set(ConfigData.aimbot.smoothness) end
+    if self.ui.sliderTriggerbotDelay then self.ui.sliderTriggerbotDelay:Set(ConfigData.aimbot.triggerbotDelay) end
+    if self.ui.sliderTriggerbotFOV then self.ui.sliderTriggerbotFOV:Set(ConfigData.aimbot.triggerbotFov) end
+    if self.ui.sliderPrediction then self.ui.sliderPrediction:Set(ConfigData.aimbot.prediction * 1000) end
+    if self.ui.sliderFillTransparency then self.ui.sliderFillTransparency:Set(ConfigData.esp.highlightFillTransparency * 100) end
+    if self.ui.sliderWalkSpeed then self.ui.sliderWalkSpeed:Set(ConfigData.misc.walkSpeed) end
+    if self.ui.sliderFlySpeed then self.ui.sliderFlySpeed:Set(ConfigData.misc.flySpeed) end
+    if self.ui.sliderHitboxSize then self.ui.sliderHitboxSize:Set(ConfigData.misc.hitboxSize) end
+    if self.ui.sliderHitboxTransparency then self.ui.sliderHitboxTransparency:Set(ConfigData.misc.hitboxTransparency * 100) end
     
-    print("✅ Config applied to UI")
+    -- Apply dropdowns
+    if self.ui.dropdownBoxType then self.ui.dropdownBoxType:Set(ConfigData.esp.boxType) end
+    if self.ui.dropdownSnaplineMode then self.ui.dropdownSnaplineMode:Set(ConfigData.esp.snaplineMode) end
+    if self.ui.dropdownActivationKey then self.ui.dropdownActivationKey:Set(ConfigData.aimbot.activationKey) end
+    if self.ui.dropdownBodyAim then self.ui.dropdownBodyAim:Set(ConfigData.aimbot.bodyAim) end
+    if self.ui.dropdownHitboxPart then self.ui.dropdownHitboxPart:Set(ConfigData.misc.hitboxPart) end
+    
+    -- Apply toggles
+    if self.espToggle then self.espToggle:Set(ConfigData.esp.enabled) end
+    if self.aimbotToggle then self.aimbotToggle:Set(ConfigData.aimbot.enabled) end
+    if self.flyToggle then self.flyToggle:Set(ConfigData.misc.flyEnabled) end
+    if self.hitboxToggle then self.hitboxToggle:Set(ConfigData.misc.hitboxEnabled) end
+    if self.ui.boxToggle then self.ui.boxToggle:Set(ConfigData.esp.boxEnabled) end
+    if self.ui.outlineToggle then self.ui.outlineToggle:Set(ConfigData.esp.outlineEnabled) end
+    if self.ui.nameToggle then self.ui.nameToggle:Set(ConfigData.esp.nameEnabled) end
+    if self.ui.distanceToggle then self.ui.distanceToggle:Set(ConfigData.esp.distanceEnabled) end
+    if self.ui.healthBarToggle then self.ui.healthBarToggle:Set(ConfigData.esp.healthBarEnabled) end
+    if self.ui.skeletonToggle then self.ui.skeletonToggle:Set(ConfigData.esp.skeletonEnabled) end
+    if self.ui.highlightToggle then self.ui.highlightToggle:Set(ConfigData.esp.highlightEnabled) end
+    if self.ui.snaplineToggle then self.ui.snaplineToggle:Set(ConfigData.esp.snaplineEnabled) end
+    if self.ui.showFovToggle then self.ui.showFovToggle:Set(ConfigData.aimbot.showFov) end
+    if self.ui.triggerbotToggle then self.ui.triggerbotToggle:Set(ConfigData.aimbot.triggerbotEnabled) end
+    
+    print("Config applied to UI")
     print("ConfigData saved settings:", ConfigData.esp.enabled, ConfigData.esp.boxEnabled, ConfigData.aimbot.enabled)
 end
 
@@ -2673,21 +2604,29 @@ function App:_bindConfigToUI()
     table.insert(self.uiElements, {type="toggle", ref=self.ui.boxToggle, category="esp", key="boxEnabled"})
     table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownBoxType, category="esp", key="boxType"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.outlineToggle, category="esp", key="outlineEnabled"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorBoxColor, category="esp", key="boxColor"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorOutlineColor, category="esp", key="outlineColor"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.nameToggle, category="esp", key="nameEnabled"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorNameColor, category="esp", key="nameColor"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.distanceToggle, category="esp", key="distanceEnabled"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorDistanceColor, category="esp", key="distanceColor"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.healthBarToggle, category="esp", key="healthBarEnabled"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorHealthBarColor, category="esp", key="healthBarColor"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.skeletonToggle, category="esp", key="skeletonEnabled"})
     table.insert(self.uiElements, {type="color", ref=self.ui.colorSkeletonColor, category="esp", key="skeletonColor"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.highlightToggle, category="esp", key="highlightEnabled"})
     table.insert(self.uiElements, {type="color", ref=self.ui.colorHighlightColor, category="esp", key="highlightFillColor"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorHighlightOutlineColor, category="esp", key="highlightOutlineColor"})
     table.insert(self.uiElements, {type="slider", ref=self.ui.sliderFillTransparency, category="esp", key="highlightFillTransparency"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.snaplineToggle, category="esp", key="snaplineEnabled"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorSnaplineColor, category="esp", key="snaplineColor"})
     table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownSnaplineMode, category="esp", key="snaplineMode"})
     
     -- Aimbot
     table.insert(self.uiElements, {type="toggle", ref=self.aimbotToggle, category="aimbot", key="enabled"})
     table.insert(self.uiElements, {type="slider", ref=self.ui.sliderFOV, category="aimbot", key="fov"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.showFovToggle, category="aimbot", key="showFov"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorFovColor, category="aimbot", key="fovColor"})
     table.insert(self.uiElements, {type="slider", ref=self.ui.sliderSmoothness, category="aimbot", key="smoothness"})
     table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownActivationKey, category="aimbot", key="activationKey"})
     table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownBodyAim, category="aimbot", key="bodyAim"})
@@ -2766,48 +2705,7 @@ function App:_setupAimbot()
 end
 
 function App:_setupMisc()
-    -- Infinite Jump
-    self.ui:_connect(Services.UserInputService.JumpRequest, function()
-        if ConfigData.misc.infiniteJump then
-            local char = LocalPlayer.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-            end
-        end
-    end)
-    
-    -- Character respawn handling
-    self.ui:_connect(LocalPlayer.CharacterAdded, function()
-        if ConfigData.misc.flyEnabled then
-            task.wait(0.5)
-            self.misc:toggleFly(false)
-            task.wait(0.1)
-            self.misc:toggleFly(true, ConfigData.misc.flySpeed)
-        end
-    end)
-    
-    -- Update loops
-    self.ui:_connect(Services.RunService.Stepped, function()
-        self.misc:updateNoclip(ConfigData.misc.noclipEnabled)
-    end)
-    
-    self.ui:_connect(Services.RunService.Heartbeat, function()
-        self.misc:updateWalkSpeed(ConfigData.misc.walkSpeed, ConfigData.misc.loopWalkSpeed)
-        self.misc:updateHitbox({
-            enabled = ConfigData.misc.hitboxEnabled,
-            size = ConfigData.misc.hitboxSize,
-            transparency = ConfigData.misc.hitboxTransparency,
-            visible = ConfigData.misc.hitboxVisible,
-            part = ConfigData.misc.hitboxPart,
-            teamCheck = ConfigData.misc.hitboxTeamCheck,
-        })
-        self.misc:updateBuildingTextures({
-            enabled = ConfigData.render.buildingTextureEnabled,
-            color1 = ConfigData.render.textureColor1,
-            color2 = ConfigData.render.textureColor2,
-        })
-    end)
+    -- No misc features enabled (all removed due to detection)
 end
 
 function App:_setupHotkeys()
