@@ -366,13 +366,42 @@ end
 function UI:AnimateOpen()
     if not self.mainFrame then return end
 
+    -- Store the real center position
+    local centerPos = UDim2.new(0.5, -330, 0.5, -255)
+    local startPos  = UDim2.new(0.5, -330, 0.5, -230)  -- slightly above
+
     self.mainFrame.Visible = true
     self.mainFrame.BackgroundTransparency = 1
+    self.mainFrame.Position = startPos
 
-    playTween(self.mainFrame, TweenInfo_Medium, { BackgroundTransparency = 0 })
-    playTween(self.stroke,    TweenInfo_Medium, { Transparency = 0 })
-    playTween(self.shadow,    TweenInfo_Medium, { ImageTransparency = 0.92 })
-    playTween(self.shadowDark,TweenInfo_Medium, { ImageTransparency = 0.65 })
+    local info = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    playTween(self.mainFrame, info, { BackgroundTransparency = 0, Position = centerPos })
+    playTween(self.stroke,    info, { Transparency = 0 })
+    playTween(self.shadow,    info, { ImageTransparency = 0.92 })
+    playTween(self.shadowDark,info, { ImageTransparency = 0.65 })
+
+    -- Animate children group (header, tabbar, content) by fading in via CanvasGroupTransparency trick
+    -- We fade all top-level children of mainFrame except shadow
+    for _, child in ipairs(self.mainFrame:GetChildren()) do
+        if child:IsA("GuiObject") and child ~= self.shadow and child ~= self.shadowDark then
+            if child:IsA("Frame") or child:IsA("ScrollingFrame") then
+                child.BackgroundTransparency = 1
+                playTween(child, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = child.BackgroundTransparency == 1 and 0 or child.BackgroundTransparency })
+            end
+            -- Fade text in children
+            for _, desc in ipairs(child:GetDescendants()) do
+                if desc:IsA("TextLabel") or desc:IsA("TextButton") then
+                    local origTrans = desc:GetAttribute("OrigTextTrans") or 0
+                    desc.TextTransparency = 1
+                    playTween(desc, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = origTrans })
+                elseif desc:IsA("ImageLabel") and desc ~= self.shadow and desc ~= self.shadowDark then
+                    local orig = desc:GetAttribute("OrigImageTrans") or 0
+                    desc.ImageTransparency = 1
+                    playTween(desc, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { ImageTransparency = orig })
+                end
+            end
+        end
+    end
 end
 
 function UI:AnimateClose(callback)
@@ -381,12 +410,27 @@ function UI:AnimateClose(callback)
         return
     end
 
-    playTween(self.mainFrame,  TweenInfo_Fast, { BackgroundTransparency = 1 })
-    playTween(self.stroke,     TweenInfo_Fast, { Transparency = 1 })
-    playTween(self.shadow,     TweenInfo_Fast, { ImageTransparency = 1 })
-    playTween(self.shadowDark, TweenInfo_Fast, { ImageTransparency = 1 })
+    local endPos = UDim2.new(0.5, -330, 0.5, -280)
+    local info   = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
-    task.wait(0.18)
+    playTween(self.mainFrame,  info, { BackgroundTransparency = 1, Position = endPos })
+    playTween(self.stroke,     info, { Transparency = 1 })
+    playTween(self.shadow,     info, { ImageTransparency = 1 })
+    playTween(self.shadowDark, info, { ImageTransparency = 1 })
+
+    for _, child in ipairs(self.mainFrame:GetChildren()) do
+        if child:IsA("GuiObject") and child ~= self.shadow and child ~= self.shadowDark then
+            for _, desc in ipairs(child:GetDescendants()) do
+                if desc:IsA("TextLabel") or desc:IsA("TextButton") then
+                    playTween(desc, info, { TextTransparency = 1 })
+                elseif desc:IsA("ImageLabel") and desc ~= self.shadow and desc ~= self.shadowDark then
+                    playTween(desc, info, { ImageTransparency = 1 })
+                end
+            end
+        end
+    end
+
+    task.wait(0.22)
     if callback then callback() end
 end
 
@@ -1120,41 +1164,41 @@ end
 
 function UI:CreateDropdown(parent, text, options, default, callback)
     local dropdown = Instance.new("Frame")
-    dropdown.Size = UDim2.new(1, 0, 0, 48)
+    dropdown.Size = UDim2.new(1, 0, 0, 50)
     dropdown.BackgroundTransparency = 1
     dropdown.ClipsDescendants = false
     dropdown.ZIndex = 10
     dropdown.Parent = parent
-    
+
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 18)
+    label.Size = UDim2.new(1, 0, 0, 16)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
     label.Font = Enum.Font.Gotham
-    label.TextSize = 12
+    label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.ZIndex = 10
     label.Parent = dropdown
-    
+
     local box = Instance.new("Frame")
-    box.Size = UDim2.new(1, 0, 0, 24)
-    box.Position = UDim2.new(0, 0, 0, 22)
+    box.Size = UDim2.new(1, 0, 0, 28)
+    box.Position = UDim2.new(0, 0, 0, 18)
     box.BackgroundColor3 = Colors.BackgroundLighter
     box.BorderSizePixel = 0
     box.ClipsDescendants = false
     box.ZIndex = 10
     box.Parent = dropdown
-    
+
     local boxCorner = Instance.new("UICorner")
-    boxCorner.CornerRadius = UDim.new(0, 4)
+    boxCorner.CornerRadius = UDim.new(0, 5)
     boxCorner.Parent = box
-    
+
     local stroke = Instance.new("UIStroke")
     stroke.Color = Colors.Border
     stroke.Thickness = 1
     stroke.Parent = box
-    
+
     local selected = Instance.new("TextLabel")
     selected.Size = UDim2.new(1, -28, 1, 0)
     selected.Position = UDim2.new(0, 8, 0, 0)
@@ -1166,100 +1210,172 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     selected.TextXAlignment = Enum.TextXAlignment.Left
     selected.ZIndex = 11
     selected.Parent = box
-    
+
     local arrow = Instance.new("TextLabel")
     arrow.Size = UDim2.new(0, 20, 1, 0)
     arrow.Position = UDim2.new(1, -22, 0, 0)
     arrow.BackgroundTransparency = 1
     arrow.Text = "▼"
-    arrow.TextColor3 = Colors.TextMuted
-    arrow.Font = Enum.Font.Gotham
+    arrow.TextColor3 = Colors.Accent
+    arrow.Font = Enum.Font.GothamBold
     arrow.TextSize = 10
     arrow.ZIndex = 11
     arrow.Parent = box
-    
+
+    -- List is parented to ScreenGui to escape clipping
+    local listHeight = math.min(#options, 6) * 28 + 8
     local list = Instance.new("Frame")
-    list.Size = UDim2.new(1, 0, 0, math.min(#options, 5) * 26 + 8)
-    list.Position = UDim2.new(0, 0, 1, 4)
-    list.BackgroundColor3 = Colors.BackgroundLighter
+    list.Size = UDim2.new(0, 0, 0, listHeight)  -- width set on open
+    list.BackgroundColor3 = Colors.BackgroundLight
     list.BorderSizePixel = 0
     list.Visible = false
-    list.ZIndex = 50
-    list.Parent = box
-    
+    list.ZIndex = 200
+    list.Parent = self.screenGui
+
     local listCorner = Instance.new("UICorner")
-    listCorner.CornerRadius = UDim.new(0, 4)
+    listCorner.CornerRadius = UDim.new(0, 6)
     listCorner.Parent = list
-    
+
     local listStroke = Instance.new("UIStroke")
-    listStroke.Color = Colors.Border
+    listStroke.Color = Colors.Accent
     listStroke.Thickness = 1
+    listStroke.Transparency = 0.6
     listStroke.Parent = list
-    
+
     local listLayout = Instance.new("UIListLayout")
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Padding = UDim.new(0, 2)
     listLayout.Parent = list
-    
+
     local listPadding = Instance.new("UIPadding")
     listPadding.PaddingTop = UDim.new(0, 4)
+    listPadding.PaddingBottom = UDim.new(0, 4)
     listPadding.PaddingLeft = UDim.new(0, 4)
     listPadding.PaddingRight = UDim.new(0, 4)
     listPadding.Parent = list
-    
+
     for _, opt in ipairs(options) do
         local optBtn = Instance.new("TextButton")
-        optBtn.Size = UDim2.new(1, -8, 0, 24)
+        optBtn.Size = UDim2.new(1, -8, 0, 26)
         optBtn.BackgroundColor3 = Colors.BackgroundLighter
+        optBtn.BackgroundTransparency = 1
         optBtn.BorderSizePixel = 0
-        optBtn.Text = opt
+        optBtn.Text = "  " .. opt
         optBtn.TextColor3 = Colors.TextSecondary
         optBtn.Font = Enum.Font.Gotham
         optBtn.TextSize = 12
         optBtn.TextXAlignment = Enum.TextXAlignment.Left
-        optBtn.ZIndex = 51
+        optBtn.AutoButtonColor = false
+        optBtn.ZIndex = 201
         optBtn.Parent = list
-        
+
         local optCorner = Instance.new("UICorner")
         optCorner.CornerRadius = UDim.new(0, 4)
         optCorner.Parent = optBtn
-        
+
         self:_connect(optBtn.MouseButton1Click, function()
             selected.Text = opt
             list.Visible = false
             arrow.Text = "▼"
+            playTween(stroke, TweenInfo_Fast, {Color = Colors.Border})
             if callback then callback(opt) end
         end)
-        
+
         self:_connect(optBtn.MouseEnter, function()
-            Services.TweenService:Create(optBtn, TweenInfo.new(0.1), {BackgroundColor3 = Colors.Accent, TextColor3 = Colors.Text}):Play()
+            playTween(optBtn, TweenInfo_Fast, {BackgroundTransparency = 0, BackgroundColor3 = Colors.AccentDark})
+            playTween(optBtn, TweenInfo_Fast, {TextColor3 = Colors.Text})
         end)
-        
+
         self:_connect(optBtn.MouseLeave, function()
-            Services.TweenService:Create(optBtn, TweenInfo.new(0.1), {BackgroundColor3 = Colors.BackgroundLighter, TextColor3 = Colors.TextSecondary}):Play()
+            playTween(optBtn, TweenInfo_Fast, {BackgroundTransparency = 1})
+            playTween(optBtn, TweenInfo_Fast, {TextColor3 = Colors.TextSecondary})
         end)
     end
-    
+
     local isOpen = false
-    
+
+    local function openList()
+        -- Close all others first
+        for _, other in ipairs(self.openDropdowns) do
+            if other ~= list then
+                other.Visible = false
+            end
+        end
+
+        -- Position list absolutely using box's AbsolutePosition
+        local absPos = box.AbsolutePosition
+        local absSize = box.AbsoluteSize
+        list.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
+        list.Size = UDim2.new(0, absSize.X, 0, listHeight)
+        list.Visible = true
+
+        -- Slide-in animation
+        list.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y)
+        list.BackgroundTransparency = 0.3
+        playTween(list, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4),
+            BackgroundTransparency = 0,
+        })
+    end
+
+    local function closeList()
+        local absPos = box.AbsolutePosition
+        local absSize = box.AbsoluteSize
+        playTween(list, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y),
+            BackgroundTransparency = 1,
+        })
+        task.delay(0.13, function() list.Visible = false end)
+    end
+
     local toggleBtn = Instance.new("TextButton")
     toggleBtn.Size = UDim2.new(1, 0, 1, 0)
     toggleBtn.BackgroundTransparency = 1
     toggleBtn.Text = ""
     toggleBtn.ZIndex = 12
     toggleBtn.Parent = box
-    
+
+    self:_connect(toggleBtn.MouseEnter, function()
+        playTween(box, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundHover})
+    end)
+    self:_connect(toggleBtn.MouseLeave, function()
+        playTween(box, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundLighter})
+    end)
+
     self:_connect(toggleBtn.MouseButton1Click, function()
         isOpen = not isOpen
-        list.Visible = isOpen
         arrow.Text = isOpen and "▲" or "▼"
+        playTween(stroke, TweenInfo_Fast, {Color = isOpen and Colors.Accent or Colors.Border})
         if isOpen then
-            for _, other in ipairs(self.openDropdowns) do other.Visible = false end
+            openList()
+        else
+            closeList()
         end
     end)
-    
+
+    -- Close when clicking outside
+    self:_connect(Services.UserInputService.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and isOpen then
+            local mousePos = Services.UserInputService:GetMouseLocation()
+            local lp = list.AbsolutePosition
+            local ls = list.AbsoluteSize
+            local inList = mousePos.X >= lp.X and mousePos.X <= lp.X + ls.X
+                       and mousePos.Y >= lp.Y and mousePos.Y <= lp.Y + ls.Y
+            local bp = box.AbsolutePosition
+            local bs = box.AbsoluteSize
+            local inBox = mousePos.X >= bp.X and mousePos.X <= bp.X + bs.X
+                      and mousePos.Y >= bp.Y and mousePos.Y <= bp.Y + bs.Y
+            if not inList and not inBox then
+                isOpen = false
+                arrow.Text = "▼"
+                playTween(stroke, TweenInfo_Fast, {Color = Colors.Border})
+                closeList()
+            end
+        end
+    end)
+
     table.insert(self.openDropdowns, list)
-    
+
     return {Set = function(_, v) selected.Text = v end, Get = function() return selected.Text end}
 end
 
