@@ -781,6 +781,15 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     btn.Text = ""
     btn.Parent = track
     
+    -- Hover effect for slider knob
+    self:_connect(btn.MouseEnter, function()
+        playTween(fill, TweenInfo_Fast, {Size = UDim2.new((current - min) / (max - min), 0, 1, 0), BackgroundColor3 = Colors.AccentLight})
+    end)
+    
+    self:_connect(btn.MouseLeave, function()
+        playTween(fill, TweenInfo_Fast, {BackgroundColor3 = Colors.Accent})
+    end)
+    
     local dragging, current = false, default
     
     local function update(input)
@@ -1710,6 +1719,7 @@ function App.new()
     self.espObjects = {}
     self.aimbot = AimbotSystem.new()
     self.misc = MiscSystem.new()
+    self.uiElements = {}  -- Store references to UI elements for config binding
     
     self:_buildUI()
     self:_setupESP()
@@ -1721,7 +1731,8 @@ function App.new()
     task.spawn(function()
         task.wait(0.5)
         loadConfig()
-        self:_applyConfig()
+        self:_bindConfigToUI()  -- Bind UI elements to ConfigData
+        self:_applyConfig()     -- Then apply values
     end)
     
     return self
@@ -1737,58 +1748,58 @@ function App:_buildUI()
     -- VISUALS TAB
     local espGeneral = self.ui:AddSection(visualsContent, "ESP General")
     self.espToggle = self.ui:CreateToggle(espGeneral, "Enable ESP", ConfigData.esp.enabled, function(v) ConfigData.esp.enabled = v end)
-    self.ui:CreateToggle(espGeneral, "Box ESP", ConfigData.esp.boxEnabled, function(v) ConfigData.esp.boxEnabled = v end)
-    self.ui:CreateDropdown(espGeneral, "Box Type", {"Standard", "Corner", "Rounded", "Dashed"}, ConfigData.esp.boxType, function(v) ConfigData.esp.boxType = v end)
-    self.ui:CreateToggle(espGeneral, "Box Outline", ConfigData.esp.outlineEnabled, function(v) ConfigData.esp.outlineEnabled = v end)
-    self.ui:CreateToggle(espGeneral, "Name ESP", ConfigData.esp.nameEnabled, function(v) ConfigData.esp.nameEnabled = v end)
-    self.ui:CreateToggle(espGeneral, "Distance ESP", ConfigData.esp.distanceEnabled, function(v) ConfigData.esp.distanceEnabled = v end)
-    self.ui:CreateToggle(espGeneral, "Health Bar", ConfigData.esp.healthBarEnabled, function(v) ConfigData.esp.healthBarEnabled = v end)
+    self.ui.boxToggle = self.ui:CreateToggle(espGeneral, "Box ESP", ConfigData.esp.boxEnabled, function(v) ConfigData.esp.boxEnabled = v end)
+    self.ui.dropdownBoxType = self.ui:CreateDropdown(espGeneral, "Box Type", {"Standard", "Corner", "Rounded", "Dashed"}, ConfigData.esp.boxType, function(v) ConfigData.esp.boxType = v end)
+    self.ui.outlineToggle = self.ui:CreateToggle(espGeneral, "Box Outline", ConfigData.esp.outlineEnabled, function(v) ConfigData.esp.outlineEnabled = v end)
+    self.ui.nameToggle = self.ui:CreateToggle(espGeneral, "Name ESP", ConfigData.esp.nameEnabled, function(v) ConfigData.esp.nameEnabled = v end)
+    self.ui.distanceToggle = self.ui:CreateToggle(espGeneral, "Distance ESP", ConfigData.esp.distanceEnabled, function(v) ConfigData.esp.distanceEnabled = v end)
+    self.ui.healthBarToggle = self.ui:CreateToggle(espGeneral, "Health Bar", ConfigData.esp.healthBarEnabled, function(v) ConfigData.esp.healthBarEnabled = v end)
     self.ui:CreateToggle(espGeneral, "Team Check", ConfigData.esp.teamCheck, function(v) ConfigData.esp.teamCheck = v end)
     
     local espVisual = self.ui:AddSection(visualsContent, "Visual Effects")
-    self.ui:CreateToggle(espVisual, "Skeleton", ConfigData.esp.skeletonEnabled, function(v) ConfigData.esp.skeletonEnabled = v end)
-    self.ui:CreateColorPicker(espVisual, "Skeleton Color", ConfigData.esp.skeletonColor, function(c) ConfigData.esp.skeletonColor = c end)
-    self.ui:CreateToggle(espVisual, "Highlight Chams", ConfigData.esp.highlightEnabled, function(v) ConfigData.esp.highlightEnabled = v end)
-    self.ui:CreateColorPicker(espVisual, "Fill Color", ConfigData.esp.highlightFillColor, function(c) ConfigData.esp.highlightFillColor = c end)
-    self.ui:CreateSlider(espVisual, "Fill Transparency", 0, 100, ConfigData.esp.highlightFillTransparency * 100, function(v) ConfigData.esp.highlightFillTransparency = v / 100 end, "%")
-    self.ui:CreateToggle(espVisual, "Snaplines", ConfigData.esp.snaplineEnabled, function(v) ConfigData.esp.snaplineEnabled = v end)
-    self.ui:CreateDropdown(espVisual, "Snapline Origin", {"Bottom", "Center", "Top"}, ConfigData.esp.snaplineMode, function(v) ConfigData.esp.snaplineMode = v end)
+    self.ui.skeletonToggle = self.ui:CreateToggle(espVisual, "Skeleton", ConfigData.esp.skeletonEnabled, function(v) ConfigData.esp.skeletonEnabled = v end)
+    self.ui.colorSkeletonColor = self.ui:CreateColorPicker(espVisual, "Skeleton Color", ConfigData.esp.skeletonColor, function(c) ConfigData.esp.skeletonColor = c end)
+    self.ui.highlightToggle = self.ui:CreateToggle(espVisual, "Highlight Chams", ConfigData.esp.highlightEnabled, function(v) ConfigData.esp.highlightEnabled = v end)
+    self.ui.colorHighlightColor = self.ui:CreateColorPicker(espVisual, "Fill Color", ConfigData.esp.highlightFillColor, function(c) ConfigData.esp.highlightFillColor = c end)
+    self.ui.sliderFillTransparency = self.ui:CreateSlider(espVisual, "Fill Transparency", 0, 100, ConfigData.esp.highlightFillTransparency * 100, function(v) ConfigData.esp.highlightFillTransparency = v / 100 end, "%")
+    self.ui.snaplineToggle = self.ui:CreateToggle(espVisual, "Snaplines", ConfigData.esp.snaplineEnabled, function(v) ConfigData.esp.snaplineEnabled = v end)
+    self.ui.dropdownSnaplineMode = self.ui:CreateDropdown(espVisual, "Snapline Origin", {"Bottom", "Center", "Top"}, ConfigData.esp.snaplineMode, function(v) ConfigData.esp.snaplineMode = v end)
     
     -- AIMBOT TAB
     local aimGeneral = self.ui:AddSection(aimbotContent, "Aimbot Settings")
     self.aimbotToggle = self.ui:CreateToggle(aimGeneral, "Enable Aimbot", ConfigData.aimbot.enabled, function(v) ConfigData.aimbot.enabled = v end)
-    self.ui:CreateSlider(aimGeneral, "FOV", 10, 500, ConfigData.aimbot.fov, function(v) ConfigData.aimbot.fov = v end, "px")
-    self.ui:CreateToggle(aimGeneral, "Show FOV Circle", ConfigData.aimbot.showFov, function(v) ConfigData.aimbot.showFov = v end)
-    self.ui:CreateSlider(aimGeneral, "Smoothness", 1, 50, ConfigData.aimbot.smoothness, function(v) ConfigData.aimbot.smoothness = v end)
-    self.ui:CreateDropdown(aimGeneral, "Activation Key", {"MouseButton1", "MouseButton2", "MouseButton3", "Q", "E", "X", "C", "F"}, ConfigData.aimbot.activationKey, function(v) ConfigData.aimbot.activationKey = v end)
+    self.ui.sliderFOV = self.ui:CreateSlider(aimGeneral, "FOV", 10, 500, ConfigData.aimbot.fov, function(v) ConfigData.aimbot.fov = v end, "px")
+    self.ui.showFovToggle = self.ui:CreateToggle(aimGeneral, "Show FOV Circle", ConfigData.aimbot.showFov, function(v) ConfigData.aimbot.showFov = v end)
+    self.ui.sliderSmoothness = self.ui:CreateSlider(aimGeneral, "Smoothness", 1, 50, ConfigData.aimbot.smoothness, function(v) ConfigData.aimbot.smoothness = v end)
+    self.ui.dropdownActivationKey = self.ui:CreateDropdown(aimGeneral, "Activation Key", {"MouseButton1", "MouseButton2", "MouseButton3", "Q", "E", "X", "C", "F"}, ConfigData.aimbot.activationKey, function(v) ConfigData.aimbot.activationKey = v end)
     
     local aimOptions = self.ui:AddSection(aimbotContent, "Options")
-    self.ui:CreateDropdown(aimOptions, "Body Aim", {"Head", "Torso", "HumanoidRootPart", "Nearest"}, ConfigData.aimbot.bodyAim, function(v) ConfigData.aimbot.bodyAim = v end)
+    self.ui.dropdownBodyAim = self.ui:CreateDropdown(aimOptions, "Body Aim", {"Head", "Torso", "HumanoidRootPart", "Nearest"}, ConfigData.aimbot.bodyAim, function(v) ConfigData.aimbot.bodyAim = v end)
     self.ui:CreateToggle(aimOptions, "Wall Check", ConfigData.aimbot.wallCheck, function(v) ConfigData.aimbot.wallCheck = v end)
     self.ui:CreateToggle(aimOptions, "Team Check", ConfigData.aimbot.teamCheck, function(v) ConfigData.aimbot.teamCheck = v end)
     self.ui:CreateToggle(aimOptions, "Sticky Target", ConfigData.aimbot.stickyTarget, function(v) ConfigData.aimbot.stickyTarget = v end)
-    self.ui:CreateSlider(aimOptions, "Prediction", 0, 200, ConfigData.aimbot.prediction * 1000, function(v) ConfigData.aimbot.prediction = v / 1000 end, "ms")
+    self.ui.sliderPrediction = self.ui:CreateSlider(aimOptions, "Prediction", 0, 200, ConfigData.aimbot.prediction * 1000, function(v) ConfigData.aimbot.prediction = v / 1000 end, "ms")
     
     local aimTrigger = self.ui:AddSection(aimbotContent, "Triggerbot")
-    self.ui:CreateToggle(aimTrigger, "Enable Triggerbot", ConfigData.aimbot.triggerbotEnabled, function(v) ConfigData.aimbot.triggerbotEnabled = v end)
-    self.ui:CreateSlider(aimTrigger, "Delay", 0, 500, ConfigData.aimbot.triggerbotDelay, function(v) ConfigData.aimbot.triggerbotDelay = v end, "ms")
-    self.ui:CreateSlider(aimTrigger, "FOV", 5, 200, ConfigData.aimbot.triggerbotFov, function(v) ConfigData.aimbot.triggerbotFov = v end, "px")
+    self.ui.triggerbotToggle = self.ui:CreateToggle(aimTrigger, "Enable Triggerbot", ConfigData.aimbot.triggerbotEnabled, function(v) ConfigData.aimbot.triggerbotEnabled = v end)
+    self.ui.sliderTriggerbotDelay = self.ui:CreateSlider(aimTrigger, "Delay", 0, 500, ConfigData.aimbot.triggerbotDelay, function(v) ConfigData.aimbot.triggerbotDelay = v end, "ms")
+    self.ui.sliderTriggerbotFOV = self.ui:CreateSlider(aimTrigger, "FOV", 5, 200, ConfigData.aimbot.triggerbotFov, function(v) ConfigData.aimbot.triggerbotFov = v end, "px")
     
     -- MISC TAB
     local miscMovement = self.ui:AddSection(miscContent, "Movement")
-    self.ui:CreateSlider(miscMovement, "Walk Speed", 0, 200, ConfigData.misc.walkSpeed, function(v) ConfigData.misc.walkSpeed = v end)
+    self.ui.sliderWalkSpeed = self.ui:CreateSlider(miscMovement, "Walk Speed", 0, 200, ConfigData.misc.walkSpeed, function(v) ConfigData.misc.walkSpeed = v end)
     self.ui:CreateToggle(miscMovement, "Loop WalkSpeed", ConfigData.misc.loopWalkSpeed, function(v) ConfigData.misc.loopWalkSpeed = v end)
     self.ui:CreateToggle(miscMovement, "Infinite Jump", ConfigData.misc.infiniteJump, function(v) ConfigData.misc.infiniteJump = v end)
     self.flyToggle = self.ui:CreateToggle(miscMovement, "Fly", ConfigData.misc.flyEnabled, function(v) ConfigData.misc.flyEnabled = v; self.misc:toggleFly(v, ConfigData.misc.flySpeed) end)
-    self.ui:CreateSlider(miscMovement, "Fly Speed", 1, 300, ConfigData.misc.flySpeed, function(v) ConfigData.misc.flySpeed = v end)
+    self.ui.sliderFlySpeed = self.ui:CreateSlider(miscMovement, "Fly Speed", 1, 300, ConfigData.misc.flySpeed, function(v) ConfigData.misc.flySpeed = v end)
     self.ui:CreateToggle(miscMovement, "Noclip", ConfigData.misc.noclipEnabled, function(v) ConfigData.misc.noclipEnabled = v end)
     
     local miscHitbox = self.ui:AddSection(miscContent, "Hitbox Expander")
     self.hitboxToggle = self.ui:CreateToggle(miscHitbox, "Enable", ConfigData.misc.hitboxEnabled, function(v) ConfigData.misc.hitboxEnabled = v end)
-    self.ui:CreateSlider(miscHitbox, "Size", 1, 50, ConfigData.misc.hitboxSize, function(v) ConfigData.misc.hitboxSize = v end)
-    self.ui:CreateSlider(miscHitbox, "Transparency", 0, 100, ConfigData.misc.hitboxTransparency * 100, function(v) ConfigData.misc.hitboxTransparency = v / 100 end, "%")
+    self.ui.sliderHitboxSize = self.ui:CreateSlider(miscHitbox, "Size", 1, 50, ConfigData.misc.hitboxSize, function(v) ConfigData.misc.hitboxSize = v end)
+    self.ui.sliderHitboxTransparency = self.ui:CreateSlider(miscHitbox, "Transparency", 0, 100, ConfigData.misc.hitboxTransparency * 100, function(v) ConfigData.misc.hitboxTransparency = v / 100 end, "%")
     self.ui:CreateToggle(miscHitbox, "Visible", ConfigData.misc.hitboxVisible, function(v) ConfigData.misc.hitboxVisible = v end)
-    self.ui:CreateDropdown(miscHitbox, "Target Part", {"HumanoidRootPart", "Head"}, ConfigData.misc.hitboxPart, function(v) ConfigData.misc.hitboxPart = v end)
+    self.ui.dropdownHitboxPart = self.ui:CreateDropdown(miscHitbox, "Target Part", {"HumanoidRootPart", "Head"}, ConfigData.misc.hitboxPart, function(v) ConfigData.misc.hitboxPart = v end)
     self.ui:CreateToggle(miscHitbox, "Team Check", ConfigData.misc.hitboxTeamCheck, function(v) ConfigData.misc.hitboxTeamCheck = v end)
     
     -- CONFIG TAB
@@ -1827,19 +1838,89 @@ function App:_buildUI()
 end
 
 function App:_applyConfig()
-    -- Apply ESP settings to UI
+    print("🔄 Applying config to UI...")
+    
+    -- Apply toggles
     if self.espToggle then self.espToggle:Set(ConfigData.esp.enabled) end
-    
-    -- Apply Aimbot settings
     if self.aimbotToggle then self.aimbotToggle:Set(ConfigData.aimbot.enabled) end
-    
-    -- Apply Misc settings
     if self.flyToggle then self.flyToggle:Set(ConfigData.misc.flyEnabled) end
+    if self.hitboxToggle then self.hitboxToggle:Set(ConfigData.misc.hitboxEnabled) end
+    
+    -- Apply sliders
+    if self.ui.sliderWalkSpeed then self.ui.sliderWalkSpeed:Set(ConfigData.misc.walkSpeed) end
+    if self.ui.sliderFlySpeed then self.ui.sliderFlySpeed:Set(ConfigData.misc.flySpeed) end
+    if self.ui.sliderHitboxSize then self.ui.sliderHitboxSize:Set(ConfigData.misc.hitboxSize) end
+    if self.ui.sliderHitboxTransparency then self.ui.sliderHitboxTransparency:Set(ConfigData.misc.hitboxTransparency * 100) end
+    if self.ui.sliderFOV then self.ui.sliderFOV:Set(ConfigData.aimbot.fov) end
+    if self.ui.sliderSmoothness then self.ui.sliderSmoothness:Set(ConfigData.aimbot.smoothness) end
+    if self.ui.sliderTriggerbotDelay then self.ui.sliderTriggerbotDelay:Set(ConfigData.aimbot.triggerbotDelay) end
+    if self.ui.sliderTriggerbotFOV then self.ui.sliderTriggerbotFOV:Set(ConfigData.aimbot.triggerbotFov) end
+    if self.ui.sliderPrediction then self.ui.sliderPrediction:Set(ConfigData.aimbot.prediction * 1000) end
+    if self.ui.sliderFillTransparency then self.ui.sliderFillTransparency:Set(ConfigData.esp.highlightFillTransparency * 100) end
+    
+    -- Apply dropdowns
+    if self.ui.dropdownBoxType then self.ui.dropdownBoxType:Set(ConfigData.esp.boxType) end
+    if self.ui.dropdownSnaplineMode then self.ui.dropdownSnaplineMode:Set(ConfigData.esp.snaplineMode) end
+    if self.ui.dropdownActivationKey then self.ui.dropdownActivationKey:Set(ConfigData.aimbot.activationKey) end
+    if self.ui.dropdownBodyAim then self.ui.dropdownBodyAim:Set(ConfigData.aimbot.bodyAim) end
+    if self.ui.dropdownHitboxPart then self.ui.dropdownHitboxPart:Set(ConfigData.misc.hitboxPart) end
+    
+    -- Apply colors (need to update color picker preview)
+    -- Note: CreateColorPicker returns an object but doesn't have Set method yet
+    
+    -- Apply colors
+    if self.ui.colorSkeletonColor then self.ui.colorSkeletonColor:Set(ConfigData.esp.skeletonColor) end
+    if self.ui.colorHighlightColor then self.ui.colorHighlightColor:Set(ConfigData.esp.highlightFillColor) end
+    
+    -- Apply fly state
     if ConfigData.misc.flyEnabled then
         self.misc:toggleFly(true, ConfigData.misc.flySpeed)
+    else
+        self.misc:toggleFly(false)
     end
     
     print("✅ Config applied to UI")
+    print("ConfigData saved settings:", ConfigData.esp.enabled, ConfigData.esp.boxEnabled, ConfigData.aimbot.enabled)
+end
+
+function App:_bindConfigToUI()
+    -- Bind UI elements to ConfigData for real-time sync
+    -- ESP
+    table.insert(self.uiElements, {type="toggle", ref=self.espToggle, category="esp", key="enabled"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.boxToggle, category="esp", key="boxEnabled"})
+    table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownBoxType, category="esp", key="boxType"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.outlineToggle, category="esp", key="outlineEnabled"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.nameToggle, category="esp", key="nameEnabled"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.distanceToggle, category="esp", key="distanceEnabled"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.healthBarToggle, category="esp", key="healthBarEnabled"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.skeletonToggle, category="esp", key="skeletonEnabled"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorSkeletonColor, category="esp", key="skeletonColor"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.highlightToggle, category="esp", key="highlightEnabled"})
+    table.insert(self.uiElements, {type="color", ref=self.ui.colorHighlightColor, category="esp", key="highlightFillColor"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderFillTransparency, category="esp", key="highlightFillTransparency"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.snaplineToggle, category="esp", key="snaplineEnabled"})
+    table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownSnaplineMode, category="esp", key="snaplineMode"})
+    
+    -- Aimbot
+    table.insert(self.uiElements, {type="toggle", ref=self.aimbotToggle, category="aimbot", key="enabled"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderFOV, category="aimbot", key="fov"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.showFovToggle, category="aimbot", key="showFov"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderSmoothness, category="aimbot", key="smoothness"})
+    table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownActivationKey, category="aimbot", key="activationKey"})
+    table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownBodyAim, category="aimbot", key="bodyAim"})
+    table.insert(self.uiElements, {type="toggle", ref=self.ui.triggerbotToggle, category="aimbot", key="triggerbotEnabled"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderTriggerbotDelay, category="aimbot", key="triggerbotDelay"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderTriggerbotFOV, category="aimbot", key="triggerbotFov"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderPrediction, category="aimbot", key="prediction"})
+    
+    -- Misc
+    table.insert(self.uiElements, {type="toggle", ref=self.flyToggle, category="misc", key="flyEnabled"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderWalkSpeed, category="misc", key="walkSpeed"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderFlySpeed, category="misc", key="flySpeed"})
+    table.insert(self.uiElements, {type="toggle", ref=self.hitboxToggle, category="misc", key="hitboxEnabled"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderHitboxSize, category="misc", key="hitboxSize"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderHitboxTransparency, category="misc", key="hitboxTransparency"})
+    table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownHitboxPart, category="misc", key="hitboxPart"})
 end
 
 function App:notify(title, message)
