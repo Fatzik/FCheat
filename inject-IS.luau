@@ -35,32 +35,90 @@ Services.TweenService = getService("TweenService")
 local LocalPlayer = Services.Players.LocalPlayer
 
 -- ============================================
--- COLOR PALETTE
+-- COLOR PALETTE (MINECRAFT STYLE)
 -- ============================================
 local Colors = {
-    Background = Color3.fromRGB(12, 12, 18),
-    BackgroundLight = Color3.fromRGB(18, 18, 26),
-    BackgroundLighter = Color3.fromRGB(26, 26, 36),
-    BackgroundHover = Color3.fromRGB(32, 32, 46),
-    Border = Color3.fromRGB(45, 45, 65),
-    BorderLight = Color3.fromRGB(65, 65, 90),
-    Accent = Color3.fromRGB(88, 196, 255),
-    AccentLight = Color3.fromRGB(140, 215, 255),
-    AccentDark = Color3.fromRGB(55, 140, 210),
-    AccentGlow = Color3.fromRGB(60, 160, 230),
-    Purple = Color3.fromRGB(180, 100, 255),
-    PurpleLight = Color3.fromRGB(210, 140, 255),
-    Success = Color3.fromRGB(76, 210, 120),
-    Warning = Color3.fromRGB(255, 185, 65),
-    Danger = Color3.fromRGB(255, 85, 85),
+    Background = Color3.fromRGB(15, 15, 25),
+    BackgroundLight = Color3.fromRGB(25, 25, 35),
+    BackgroundLighter = Color3.fromRGB(35, 35, 45),
+    BackgroundHover = Color3.fromRGB(45, 45, 65),
+    Border = Color3.fromRGB(0, 0, 0),  -- Minecraft black borders
+    BorderLight = Color3.fromRGB(85, 85, 85),  -- Minecraft gray
+    Accent = Color3.fromRGB(255, 255, 85),  -- Minecraft yellow
+    AccentLight = Color3.fromRGB(255, 255, 170),
+    AccentDark = Color3.fromRGB(170, 170, 0),
+    AccentGlow = Color3.fromRGB(255, 220, 50),
+    Purple = Color3.fromRGB(170, 0, 255),
+    PurpleLight = Color3.fromRGB(210, 100, 255),
+    Success = Color3.fromRGB(85, 255, 85),  -- Minecraft green
+    Warning = Color3.fromRGB(255, 170, 0),  -- Minecraft gold/orange
+    Danger = Color3.fromRGB(255, 85, 85),  -- Minecraft red
     DangerLight = Color3.fromRGB(255, 120, 120),
-    Text = Color3.fromRGB(240, 242, 255),
-    TextSecondary = Color3.fromRGB(160, 168, 190),
-    TextMuted = Color3.fromRGB(95, 100, 120),
-    GradientStart = Color3.fromRGB(88, 196, 255),
-    GradientMid = Color3.fromRGB(140, 120, 255),
-    GradientEnd = Color3.fromRGB(200, 90, 255),
+    Text = Color3.fromRGB(255, 255, 255),  -- Minecraft white
+    TextSecondary = Color3.fromRGB(170, 170, 170),  -- Minecraft gray
+    TextMuted = Color3.fromRGB(85, 85, 85),
+    GradientStart = Color3.fromRGB(255, 255, 85),  -- Yellow
+    GradientMid = Color3.fromRGB(85, 255, 85),  -- Green
+    GradientEnd = Color3.fromRGB(85, 170, 255),  -- Blue
 }
+
+-- ============================================
+-- MINECRAFT FONT SYSTEM
+-- Blocky, pixelated Minecraft-style fonts
+-- ============================================
+local MinecraftFonts = {
+    -- Minecraft-style font mappings
+    Title = Enum.Font.GothamBlack,      -- Blocky for titles
+    Header = Enum.Font.GothamBold,      -- Bold headers
+    Body = Enum.Font.Gotham,            -- Regular text
+    Code = Enum.Font.SourceSansBold,    -- Pixelated for code
+    Pixel = Enum.Font.Arcade,           -- Very pixelated
+    Minecraft = Enum.Font.SourceSansBold, -- Main Minecraft-like
+}
+
+-- Helper function to apply Minecraft style to text elements
+local function applyMinecraftStyle(textElement, style, size)
+    style = style or "Minecraft"
+    
+    -- Set font based on style
+    textElement.Font = MinecraftFonts[style] or MinecraftFonts.Minecraft
+    
+    -- Adjust size for better Minecraft look
+    if not size then
+        if style == "Title" then
+            textElement.TextSize = 20
+        elseif style == "Header" then
+            textElement.TextSize = 16
+        elseif style == "Code" or style == "Pixel" then
+            textElement.TextSize = 14
+        else
+            textElement.TextSize = 14
+        end
+    end
+    
+    -- Add text stroke for blocky Minecraft effect
+    if not textElement:FindFirstChild("MinecraftStroke") then
+        local stroke = Instance.new("UIStroke")
+        stroke.Name = "MinecraftStroke"
+        stroke.Color = Color3.new(0, 0, 0)
+        stroke.Thickness = style == "Title" and 2 or 1
+        stroke.Transparency = 0.5
+        stroke.Parent = textElement
+    end
+    
+    -- Minecraft text coloring
+    if style == "Title" then
+        textElement.TextColor3 = Colors.Text
+    elseif style == "Header" then
+        textElement.TextColor3 = Colors.Accent
+    elseif style == "Code" then
+        textElement.TextColor3 = Colors.Success
+    else
+        textElement.TextColor3 = Colors.Text
+    end
+    
+    return textElement
+end
 
 -- ============================================
 -- ANIMATION SYSTEM (OPTIMIZED)
@@ -267,7 +325,8 @@ function UI.new()
     self.visible = false  -- Menu starts hidden, will be shown on F2
     self.tabs = {}
     self.activeTab = nil
-    self.openDropdowns = {}
+    self.openDropdowns = {}   -- legacy, kept for compat
+    self.dropdownClosers = {} -- list of {isOpen, forceClose} per dropdown
     
     self:_createScreenGui()
     self:_createMainFrame()
@@ -559,17 +618,18 @@ function UI:_createHeader()
         end
     end)
 
-    -- Title
+    -- Title (Minecraft style)
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(0, 130, 1, 0)
     title.Position = UDim2.new(0, 32, 0, 0)
     title.BackgroundTransparency = 1
-    title.Text = "blatant.cat"
-    title.TextColor3 = Colors.Text
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 17
+    title.Text = "BLATANT.CAT"
+    title.TextColor3 = Colors.Accent
+    title.Font = MinecraftFonts.Title
+    title.TextSize = 18
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = header
+    applyMinecraftStyle(title, "Title")
 
     -- Gradient on title text
     local titleGrad = Instance.new("UIGradient")
@@ -581,62 +641,60 @@ function UI:_createHeader()
     titleGrad.Parent = title
 
     local version = Instance.new("TextLabel")
-    version.Size = UDim2.new(0, 36, 0, 16)
-    version.Position = UDim2.new(0, 130, 0.5, -8)
-    version.BackgroundColor3 = Colors.AccentDark
-    version.BackgroundTransparency = 0.4
+    version.Size = UDim2.new(0, 40, 0, 18)
+    version.Position = UDim2.new(0, 130, 0.5, -9)
+    version.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    version.BackgroundTransparency = 0.2
+    version.BorderColor3 = Colors.Accent
+    version.BorderSizePixel = 2
     version.Text = "v2.0"
-    version.TextColor3 = Colors.AccentLight
-    version.Font = Enum.Font.GothamBold
+    version.TextColor3 = Colors.Accent
+    version.Font = MinecraftFonts.Pixel
     version.TextSize = 10
     version.Parent = header
-    local vCorner = Instance.new("UICorner")
-    vCorner.CornerRadius = UDim.new(0, 4)
-    vCorner.Parent = version
+    applyMinecraftStyle(version, "Code")
 
-    -- Minimize button
+    -- Minimize button (Minecraft style)
     local minBtn = Instance.new("TextButton")
-    minBtn.Size = UDim2.new(0, 26, 0, 26)
-    minBtn.Position = UDim2.new(1, -70, 0.5, -13)
-    minBtn.BackgroundColor3 = Colors.BackgroundLighter
-    minBtn.BorderSizePixel = 0
-    minBtn.Text = "−"
-    minBtn.TextColor3 = Colors.TextSecondary
-    minBtn.Font = Enum.Font.GothamBold
-    minBtn.TextSize = 16
+    minBtn.Size = UDim2.new(0, 28, 0, 28)
+    minBtn.Position = UDim2.new(1, -70, 0.5, -14)
+    minBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    minBtn.BorderColor3 = Colors.Warning
+    minBtn.BorderSizePixel = 2
+    minBtn.Text = "-"
+    minBtn.TextColor3 = Colors.Warning
+    minBtn.Font = MinecraftFonts.Title
+    minBtn.TextSize = 20
     minBtn.Parent = header
-    local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 6)
-    minCorner.Parent = minBtn
+    applyMinecraftStyle(minBtn, "Header")
     self:_connect(minBtn.MouseEnter, function()
-        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Warning, TextColor3 = Colors.Text})
+        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Warning, TextColor3 = Colors.Text, BorderColor3 = Colors.Text})
     end)
     self:_connect(minBtn.MouseLeave, function()
-        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundLighter, TextColor3 = Colors.TextSecondary})
+        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Color3.fromRGB(0,0,0), TextColor3 = Colors.Warning, BorderColor3 = Colors.Warning})
     end)
     self:_connect(minBtn.MouseButton1Click, function()
         self:SetVisible(false)
     end)
 
-    -- Close button
+    -- Close button (Minecraft style)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 26, 0, 26)
-    closeBtn.Position = UDim2.new(1, -36, 0.5, -13)
-    closeBtn.BackgroundColor3 = Colors.BackgroundLighter
-    closeBtn.BorderSizePixel = 0
-    closeBtn.Text = "×"
-    closeBtn.TextColor3 = Colors.TextSecondary
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
+    closeBtn.Size = UDim2.new(0, 28, 0, 28)
+    closeBtn.Position = UDim2.new(1, -36, 0.5, -14)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    closeBtn.BorderColor3 = Colors.Danger
+    closeBtn.BorderSizePixel = 2
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Colors.Danger
+    closeBtn.Font = MinecraftFonts.Title
+    closeBtn.TextSize = 18
     closeBtn.Parent = header
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 6)
-    closeCorner.Parent = closeBtn
+    applyMinecraftStyle(closeBtn, "Header")
     self:_connect(closeBtn.MouseEnter, function()
-        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Danger, TextColor3 = Colors.Text})
+        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Danger, TextColor3 = Colors.Text, BorderColor3 = Colors.Text})
     end)
     self:_connect(closeBtn.MouseLeave, function()
-        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.BackgroundLighter, TextColor3 = Colors.TextSecondary})
+        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Color3.fromRGB(0,0,0), TextColor3 = Colors.Danger, BorderColor3 = Colors.Danger})
     end)
     self:_connect(closeBtn.MouseButton1Click, function()
         self:SetVisible(false)
@@ -685,55 +743,54 @@ function UI:_createContentArea()
     self.contentArea.Parent = self.mainFrame
 end
 
--- Tab icons map
+-- Tab icons map (Minecraft style symbols)
 local TAB_ICONS = {
-    VISUALS = "👁",
-    AIMBOT  = "🎯",
-    MISC    = "⚙",
-    CONFIG  = "💾",
+    VISUALS = "[👁]",
+    AIMBOT  = "[🎯]",
+    MISC    = "[⚙]",
+    CONFIG  = "[�]",
 }
 
 function UI:AddTab(name)
     local icon = TAB_ICONS[name] or "•"
 
-    -- Outer wrapper (pill shape)
+    -- Outer wrapper (Minecraft square style)
     local btn = Instance.new("TextButton")
     btn.Name = name
     btn.Size = UDim2.new(0, 100, 1, -8)
-    btn.BackgroundColor3 = Colors.BackgroundLighter
+    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     btn.BackgroundTransparency = 1
+    btn.BorderColor3 = Colors.TextMuted
     btn.BorderSizePixel = 0
     btn.Text = ""
     btn.AutoButtonColor = false
     btn.Parent = self.tabContainer
 
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 6)
-    btnCorner.Parent = btn
-
-    -- Icon label
+    -- Icon label (Minecraft style)
     local iconLabel = Instance.new("TextLabel")
-    iconLabel.Size = UDim2.new(0, 20, 1, 0)
-    iconLabel.Position = UDim2.new(0, 8, 0, 0)
+    iconLabel.Size = UDim2.new(0, 24, 1, 0)
+    iconLabel.Position = UDim2.new(0, 6, 0, 0)
     iconLabel.BackgroundTransparency = 1
     iconLabel.Text = icon
     iconLabel.TextColor3 = Colors.TextMuted
-    iconLabel.Font = Enum.Font.Gotham
-    iconLabel.TextSize = 13
+    iconLabel.Font = MinecraftFonts.Pixel
+    iconLabel.TextSize = 12
     iconLabel.TextXAlignment = Enum.TextXAlignment.Left
     iconLabel.Parent = btn
+    applyMinecraftStyle(iconLabel, "Pixel")
 
-    -- Text label
+    -- Text label (Minecraft style)
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, -30, 1, 0)
     textLabel.Position = UDim2.new(0, 28, 0, 0)
     textLabel.BackgroundTransparency = 1
     textLabel.Text = name
     textLabel.TextColor3 = Colors.TextMuted
-    textLabel.Font = Enum.Font.GothamSemibold
-    textLabel.TextSize = 11
+    textLabel.Font = MinecraftFonts.Header
+    textLabel.TextSize = 12
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.Parent = btn
+    applyMinecraftStyle(textLabel, "Header")
 
     -- Active indicator bar at bottom
     local indicator = Instance.new("Frame")
@@ -767,6 +824,13 @@ function UI:AddTab(name)
     content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     content.Visible = false
     content.Parent = self.contentArea
+
+    -- Close any open dropdown when the user scrolls this tab's content
+    self:_connect(content:GetPropertyChangedSignal("CanvasPosition"), function()
+        for _, closer in ipairs(self.dropdownClosers) do
+            closer.forceClose()
+        end
+    end)
 
     local listLayout = Instance.new("UIListLayout")
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -836,75 +900,41 @@ function UI:AddSection(parent, title)
     local section = Instance.new("Frame")
     section.Name = "Section_" .. title
     section.Size = UDim2.new(1, -4, 0, 0)
-    section.BackgroundColor3 = Colors.BackgroundLight
-    section.BorderSizePixel = 0
+    section.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    section.BorderColor3 = Colors.Accent
+    section.BorderSizePixel = 2
     section.AutomaticSize = Enum.AutomaticSize.Y
     section.Parent = parent
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = section
-
-    -- Subtle inner gradient (glass feel)
-    local sectionGrad = Instance.new("UIGradient")
-    sectionGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 22, 36)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(17, 17, 26)),
-    })
-    sectionGrad.Rotation = 120
-    sectionGrad.Parent = section
-
-    -- Border stroke
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Colors.Border
-    stroke.Thickness = 1
-    stroke.Transparency = 0.3
-    stroke.Parent = section
-
-    -- Gradient accent bar on the left (blue→purple)
+    -- Minecraft left accent bar (solid yellow, no gradients)
     local accentBar = Instance.new("Frame")
-    accentBar.Size = UDim2.new(0, 3, 1, -16)
-    accentBar.Position = UDim2.new(0, 0, 0, 8)
-    accentBar.BackgroundColor3 = Color3.new(1, 1, 1)
+    accentBar.Size = UDim2.new(0, 3, 1, 0)
+    accentBar.Position = UDim2.new(0, 0, 0, 0)
+    accentBar.BackgroundColor3 = Colors.Accent
     accentBar.BorderSizePixel = 0
     accentBar.Parent = section
-    local accentCorner = Instance.new("UICorner")
-    accentCorner.CornerRadius = UDim.new(1, 0)
-    accentCorner.Parent = accentBar
-    local accentGrad = Instance.new("UIGradient")
-    accentGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Colors.GradientStart),
-        ColorSequenceKeypoint.new(1, Colors.GradientEnd),
-    })
-    accentGrad.Rotation = 90
-    accentGrad.Parent = accentBar
 
-    -- Section title
+    -- Section title (Minecraft style)
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, -20, 0, 28)
     titleLabel.Position = UDim2.new(0, 12, 0, 0)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title:upper()
-    titleLabel.TextColor3 = Colors.TextSecondary
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 10
+    titleLabel.Text = "[" .. title:upper() .. "]"
+    titleLabel.TextColor3 = Colors.Accent
+    titleLabel.Font = MinecraftFonts.Header
+    titleLabel.TextSize = 12
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = section
+    applyMinecraftStyle(titleLabel, "Header")
 
     -- Separator line under title
     local sep = Instance.new("Frame")
     sep.Size = UDim2.new(1, -16, 0, 1)
     sep.Position = UDim2.new(0, 8, 0, 28)
-    sep.BackgroundColor3 = Color3.new(1, 1, 1)
+    sep.BackgroundColor3 = Colors.Accent
+    sep.BackgroundTransparency = 0.7
     sep.BorderSizePixel = 0
     sep.Parent = section
-    local sepGrad = Instance.new("UIGradient")
-    sepGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0,   Color3.fromRGB(50, 50, 75)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(70, 70, 100)),
-        ColorSequenceKeypoint.new(1,   Color3.fromRGB(50, 50, 75)),
-    })
-    sepGrad.Parent = sep
 
     -- Items container
     local container = Instance.new("Frame")
@@ -949,10 +979,11 @@ function UI:CreateToggle(parent, text, default, callback)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggle
+    applyMinecraftStyle(label, "Minecraft", 12)
 
     local switch = Instance.new("Frame")
     switch.Size = UDim2.new(0, 36, 0, 18)
@@ -1047,10 +1078,11 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = slider
+    applyMinecraftStyle(label, "Minecraft", 12)
 
     local valueLabel = Instance.new("TextLabel")
     valueLabel.Size = UDim2.new(0.4, -6, 0, 18)
@@ -1058,9 +1090,10 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     valueLabel.BackgroundTransparency = 1
     valueLabel.Text = tostring(default) .. suffix
     valueLabel.TextColor3 = Colors.Accent
-    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.Font = MinecraftFonts.Header
     valueLabel.TextSize = 12
     valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    applyMinecraftStyle(valueLabel, "Header", 12)
     valueLabel.Parent = slider
 
     local trackBg = Instance.new("Frame")
@@ -1175,11 +1208,12 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.ZIndex = 10
     label.Parent = dropdown
+    applyMinecraftStyle(label, "Minecraft", 11)
 
     local box = Instance.new("Frame")
     box.Size = UDim2.new(1, 0, 0, 28)
@@ -1205,22 +1239,24 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     selected.BackgroundTransparency = 1
     selected.Text = default
     selected.TextColor3 = Colors.Text
-    selected.Font = Enum.Font.Gotham
+    selected.Font = MinecraftFonts.Minecraft
     selected.TextSize = 12
     selected.TextXAlignment = Enum.TextXAlignment.Left
     selected.ZIndex = 11
     selected.Parent = box
+    applyMinecraftStyle(selected, "Minecraft", 12)
 
     local arrow = Instance.new("TextLabel")
     arrow.Size = UDim2.new(0, 20, 1, 0)
     arrow.Position = UDim2.new(1, -22, 0, 0)
     arrow.BackgroundTransparency = 1
-    arrow.Text = "▼"
+    arrow.Text = "v"
     arrow.TextColor3 = Colors.Accent
-    arrow.Font = Enum.Font.GothamBold
+    arrow.Font = MinecraftFonts.Header
     arrow.TextSize = 10
     arrow.ZIndex = 11
     arrow.Parent = box
+    applyMinecraftStyle(arrow, "Header", 10)
 
     -- List is parented to ScreenGui to escape clipping
     local listHeight = math.min(#options, 6) * 28 + 8
@@ -1260,14 +1296,15 @@ function UI:CreateDropdown(parent, text, options, default, callback)
         optBtn.BackgroundColor3 = Colors.BackgroundLighter
         optBtn.BackgroundTransparency = 0.98
         optBtn.BorderSizePixel = 0
-        optBtn.Text = "  " .. opt
+        optBtn.Text = "> " .. opt
         optBtn.TextColor3 = Colors.TextSecondary
-        optBtn.Font = Enum.Font.Gotham
+        optBtn.Font = MinecraftFonts.Minecraft
         optBtn.TextSize = 12
         optBtn.TextXAlignment = Enum.TextXAlignment.Left
         optBtn.AutoButtonColor = false
         optBtn.ZIndex = 201
         optBtn.Parent = list
+        applyMinecraftStyle(optBtn, "Minecraft", 12)
 
         local optCorner = Instance.new("UICorner")
         optCorner.CornerRadius = UDim.new(0, 4)
@@ -1277,7 +1314,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
             selected.Text = opt
             isOpen = false
             list.Visible = false
-            arrow.Text = "▼"
+            arrow.Text = "v"
             playTween(stroke, TweenInfo_Fast, {Color = Colors.Border})
             if callback then callback(opt) end
         end)
@@ -1295,24 +1332,31 @@ function UI:CreateDropdown(parent, text, options, default, callback)
 
     local isOpen = false
 
+    -- Instantly close this dropdown (no animation, used when scrolling)
+    local function forceClose()
+        if not isOpen then return end
+        isOpen = false
+        arrow.Text = "v"
+        pcall(function() playTween(stroke, TweenInfo_Fast, {Color = Colors.Border}) end)
+        list.Visible = false
+    end
+
     local function openList()
-        -- Close all others first
-        for _, other in ipairs(self.openDropdowns) do
-            if other ~= list then
-                other.Visible = false
+        -- Close every other dropdown immediately
+        for _, closer in ipairs(self.dropdownClosers) do
+            if closer.forceClose ~= forceClose then
+                closer.forceClose()
             end
         end
 
-        -- Position list absolutely using box's AbsolutePosition
+        -- Recompute absolute position every time (user may have scrolled)
         local absPos = box.AbsolutePosition
         local absSize = box.AbsoluteSize
-        list.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4)
         list.Size = UDim2.new(0, absSize.X, 0, listHeight)
-        list.Visible = true
-
-        -- Slide-in animation
         list.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y)
         list.BackgroundTransparency = 0.3
+        list.Visible = true
+
         playTween(list, TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
             Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 4),
             BackgroundTransparency = 0,
@@ -1345,7 +1389,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
 
     self:_connect(toggleBtn.MouseButton1Click, function()
         isOpen = not isOpen
-        arrow.Text = isOpen and "▲" or "▼"
+        arrow.Text = isOpen and "^" or "v"
         playTween(stroke, TweenInfo_Fast, {Color = isOpen and Colors.Accent or Colors.Border})
         if isOpen then
             openList()
@@ -1368,7 +1412,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
                       and mousePos.Y >= bp.Y and mousePos.Y <= bp.Y + bs.Y
             if not inList and not inBox then
                 isOpen = false
-                arrow.Text = "▼"
+                arrow.Text = "v"
                 playTween(stroke, TweenInfo_Fast, {Color = Colors.Border})
                 closeList()
             end
@@ -1376,6 +1420,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     end)
 
     table.insert(self.openDropdowns, list)
+    table.insert(self.dropdownClosers, {forceClose = forceClose})
 
     return {Set = function(_, v) selected.Text = v end, Get = function() return selected.Text end}
 end
@@ -1391,16 +1436,18 @@ function UI:CreateColorPicker(parent, text, default, callback)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.Gotham
+    label.Font = MinecraftFonts.Minecraft
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = picker
+    applyMinecraftStyle(label, "Minecraft", 12)
     
     local preview = Instance.new("Frame")
     preview.Size = UDim2.new(0, 40, 0, 18)
     preview.Position = UDim2.new(1, -40, 0.5, -9)
     preview.BackgroundColor3 = default
-    preview.BorderSizePixel = 0
+    preview.BorderColor3 = Color3.new(0, 0, 0)
+    preview.BorderSizePixel = 2
     preview.Parent = picker
     
     local previewCorner = Instance.new("UICorner")
@@ -1429,9 +1476,9 @@ end
 function UI:CreateButton(parent, text, callback, style)
     style = style or "default"
 
-    local baseColor   = style == "danger"  and Color3.fromRGB(50, 20, 20)
-                     or style == "success" and Color3.fromRGB(20, 50, 30)
-                     or Colors.BackgroundLighter
+    local baseColor   = style == "danger"  and Color3.fromRGB(50, 10, 10)
+                     or style == "success" and Color3.fromRGB(10, 50, 10)
+                     or Color3.fromRGB(20, 20, 20)
     local accentColor = style == "danger"  and Colors.Danger
                      or style == "success" and Colors.Success
                      or Colors.Accent
@@ -1439,39 +1486,29 @@ function UI:CreateButton(parent, text, callback, style)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, 0, 0, 30)
     button.BackgroundColor3 = baseColor
-    button.BorderSizePixel = 0
+    button.BorderColor3 = accentColor
+    button.BorderSizePixel = 2
     button.Text = ""
     button.AutoButtonColor = false
     button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = button
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = accentColor
-    stroke.Thickness = 1
-    stroke.Transparency = 0.7
-    stroke.Parent = button
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Colors.TextSecondary
-    label.Font = Enum.Font.GothamSemibold
-    label.TextSize = 12
+    label.Font = MinecraftFonts.Header
+    label.TextSize = 13
     label.Parent = button
+    applyMinecraftStyle(label, "Header", 13)
 
     self:_connect(button.MouseEnter, function()
-        playTween(button, TweenInfo_Fast, {BackgroundColor3 = accentColor})
+        playTween(button, TweenInfo_Fast, {BackgroundColor3 = accentColor, BorderColor3 = Colors.Text})
         playTween(label,  TweenInfo_Fast, {TextColor3 = Colors.Text})
-        playTween(stroke, TweenInfo_Fast, {Transparency = 0})
     end)
     self:_connect(button.MouseLeave, function()
-        playTween(button, TweenInfo_Fast, {BackgroundColor3 = baseColor})
+        playTween(button, TweenInfo_Fast, {BackgroundColor3 = baseColor, BorderColor3 = accentColor})
         playTween(label,  TweenInfo_Fast, {TextColor3 = Colors.TextSecondary})
-        playTween(stroke, TweenInfo_Fast, {Transparency = 0.7})
     end)
     self:_connect(button.MouseButton1Down, function()
         playTween(button, TweenInfo_Fast, {Size = UDim2.new(1, 0, 0, 27)})
@@ -1799,13 +1836,15 @@ end
 
 function AimbotSystem:getAimPart(player, bodyAim)
     if not player.Character then return nil end
-    
+    local char = player.Character
+
+    -- "Nearest" mode: pick the part whose screen position is closest to the mouse
     if bodyAim == "Nearest" then
         local cam = Services.Workspace.CurrentCamera
         local mousePos = Services.UserInputService:GetMouseLocation()
         local best, bestDist = nil, math.huge
-        
-        for _, part in ipairs(player.Character:GetChildren()) do
+
+        for _, part in ipairs(char:GetChildren()) do
             if part:IsA("BasePart") then
                 local sp, onScreen = cam:WorldToViewportPoint(part.Position)
                 if onScreen then
@@ -1819,13 +1858,35 @@ function AimbotSystem:getAimPart(player, bodyAim)
         end
         return best
     end
-    
-    local partName = bodyAim
-    if bodyAim == "Torso" then
-        partName = player.Character:FindFirstChild("UpperTorso") and "UpperTorso" or "Torso"
+
+    -- R15 → R6 fallback map.
+    -- If a named R15 part is missing (R6 rig), use the equivalent R6 part.
+    local R6_FALLBACK = {
+        UpperTorso       = "Torso",
+        LowerTorso       = "Torso",
+        Neck             = "Torso",     -- R6 has no Neck part
+        LeftUpperArm     = "Left Arm",
+        LeftLowerArm     = "Left Arm",
+        LeftHand         = "Left Arm",
+        RightUpperArm    = "Right Arm",
+        RightLowerArm    = "Right Arm",
+        RightHand        = "Right Arm",
+        LeftUpperLeg     = "Left Leg",
+        LeftLowerLeg     = "Left Leg",
+        LeftFoot         = "Left Leg",
+        RightUpperLeg    = "Right Leg",
+        RightLowerLeg    = "Right Leg",
+        RightFoot        = "Right Leg",
+        -- R6 "Torso" alias keeps the old behaviour
+        Torso            = "Torso",
+    }
+
+    -- Try the exact name first; if missing, try the R6 fallback
+    local part = char:FindFirstChild(bodyAim)
+    if not part and R6_FALLBACK[bodyAim] then
+        part = char:FindFirstChild(R6_FALLBACK[bodyAim])
     end
-    
-    return player.Character:FindFirstChild(partName)
+    return part
 end
 
 function AimbotSystem:isVisible(part)
