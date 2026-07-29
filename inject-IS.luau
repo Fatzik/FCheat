@@ -1258,7 +1258,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
         local optBtn = Instance.new("TextButton")
         optBtn.Size = UDim2.new(1, -8, 0, 26)
         optBtn.BackgroundColor3 = Colors.BackgroundLighter
-        optBtn.BackgroundTransparency = 1
+        optBtn.BackgroundTransparency = 0.98
         optBtn.BorderSizePixel = 0
         optBtn.Text = "  " .. opt
         optBtn.TextColor3 = Colors.TextSecondary
@@ -1275,6 +1275,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
 
         self:_connect(optBtn.MouseButton1Click, function()
             selected.Text = opt
+            isOpen = false
             list.Visible = false
             arrow.Text = "▼"
             playTween(stroke, TweenInfo_Fast, {Color = Colors.Border})
@@ -1990,25 +1991,26 @@ end
 
 function AimbotSystem:handleInput(input, gpe, settings, isBegin)
     if not settings.enabled then return end
-    
+    if isBegin and gpe then return end
+
     local key = KEY_MAP[settings.activationKey]
     if not key then return end
-    
+
     local matched = false
     if MOUSE_KEYS[settings.activationKey] then
         matched = input.UserInputType == key
     else
         matched = input.KeyCode == key
     end
-    
-    if matched then
-        if isBegin and not gpe then
-            self.isActive = true
-        else
-            self.isActive = false
-            if not settings.stickyTarget then
-                self.currentTarget = nil
-            end
+
+    if not matched then return end
+
+    if isBegin then
+        self.isActive = true
+    else
+        self.isActive = false
+        if not settings.stickyTarget then
+            self.currentTarget = nil
         end
     end
 end
