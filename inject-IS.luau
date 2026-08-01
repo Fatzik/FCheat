@@ -19,7 +19,12 @@
 -- ============================================
 local Services = {}
 local function getService(name)
-    return cloneref(game:GetService(name))
+    local service = game:GetService(name)
+    if type(cloneref) == "function" then
+        local ok, reference = pcall(cloneref, service)
+        if ok and reference then return reference end
+    end
+    return service
 end
 
 Services.CoreGui = getService("CoreGui")
@@ -31,35 +36,63 @@ Services.Workspace = getService("Workspace")
 Services.MarketplaceService = getService("MarketplaceService")
 Services.HttpService = getService("HttpService")
 Services.TweenService = getService("TweenService")
+Services.Lighting = getService("Lighting")
 
 local LocalPlayer = Services.Players.LocalPlayer
 
+-- Helper for table operations not in all Lua versions
+local function tableIndexOf(tbl, value)
+    for i, v in ipairs(tbl) do
+        if v == value then return i end
+    end
+    return nil
+end
+
+local function tableFind(tbl, value)
+    for _, v in ipairs(tbl) do
+        if v == value then return true end
+    end
+    return false
+end
+
+local function tableRemoveValue(tbl, value)
+    local idx = tableIndexOf(tbl, value)
+    if idx then
+        table.remove(tbl, idx)
+        return true
+    end
+    return false
+end
+
+-- Use local functions instead of modifying global table
+-- to avoid conflicts with protected environments
+
 -- ============================================
--- COLOR PALETTE (MINECRAFT STYLE)
+-- COLOR PALETTE (Modern Dark Theme)
 -- ============================================
 local Colors = {
-    Background = Color3.fromRGB(15, 15, 25),
-    BackgroundLight = Color3.fromRGB(25, 25, 35),
-    BackgroundLighter = Color3.fromRGB(35, 35, 45),
-    BackgroundHover = Color3.fromRGB(45, 45, 65),
-    Border = Color3.fromRGB(0, 0, 0),  -- Minecraft black borders
-    BorderLight = Color3.fromRGB(85, 85, 85),  -- Minecraft gray
-    Accent = Color3.fromRGB(0, 0, 0),  -- Black instead of yellow
-    AccentLight = Color3.fromRGB(50, 50, 50),
-    AccentDark = Color3.fromRGB(20, 20, 20),
-    AccentGlow = Color3.fromRGB(30, 30, 30),
+    Background = Color3.fromRGB(18, 18, 28),
+    BackgroundLight = Color3.fromRGB(28, 28, 40),
+    BackgroundLighter = Color3.fromRGB(38, 38, 55),
+    BackgroundHover = Color3.fromRGB(50, 50, 70),
+    Border = Color3.fromRGB(45, 45, 60),
+    BorderLight = Color3.fromRGB(80, 80, 100),
+    Accent = Color3.fromRGB(88, 196, 255),  -- Nice blue accent
+    AccentLight = Color3.fromRGB(120, 220, 255),
+    AccentDark = Color3.fromRGB(50, 150, 220),
+    AccentGlow = Color3.fromRGB(88, 196, 255),
     Purple = Color3.fromRGB(170, 0, 255),
     PurpleLight = Color3.fromRGB(210, 100, 255),
-    Success = Color3.fromRGB(85, 255, 85),  -- Minecraft green
-    Warning = Color3.fromRGB(255, 170, 0),  -- Minecraft gold/orange
-    Danger = Color3.fromRGB(255, 85, 85),  -- Minecraft red
+    Success = Color3.fromRGB(85, 255, 85),  -- Green
+    Warning = Color3.fromRGB(255, 200, 50),  -- Gold
+    Danger = Color3.fromRGB(255, 80, 80),   -- Red
     DangerLight = Color3.fromRGB(255, 120, 120),
-    Text = Color3.fromRGB(255, 255, 255),  -- Minecraft white
-    TextSecondary = Color3.fromRGB(170, 170, 170),  -- Minecraft gray
-    TextMuted = Color3.fromRGB(85, 85, 85),
-    GradientStart = Color3.fromRGB(0, 0, 0),  -- Black instead of yellow
-    GradientMid = Color3.fromRGB(85, 255, 85),  -- Green
-    GradientEnd = Color3.fromRGB(85, 170, 255),  -- Blue
+    Text = Color3.fromRGB(255, 255, 255),
+    TextSecondary = Color3.fromRGB(180, 180, 195),
+    TextMuted = Color3.fromRGB(100, 100, 120),
+    GradientStart = Color3.fromRGB(88, 196, 255),
+    GradientMid = Color3.fromRGB(150, 100, 255),
+    GradientEnd = Color3.fromRGB(200, 150, 255),
 }
 
 -- ============================================
@@ -104,17 +137,6 @@ local function applyMinecraftStyle(textElement, style, size)
         stroke.Thickness = style == "Title" and 2 or 1
         stroke.Transparency = 0.5
         stroke.Parent = textElement
-    end
-    
-    -- Minecraft text coloring
-    if style == "Title" then
-        textElement.TextColor3 = Colors.Text
-    elseif style == "Header" then
-        textElement.TextColor3 = Colors.Accent
-    elseif style == "Code" then
-        textElement.TextColor3 = Colors.Success
-    else
-        textElement.TextColor3 = Colors.Text
     end
     
     return textElement
@@ -167,10 +189,10 @@ local ConfigData = {
         healthBarEnabled = false,
         distanceEnabled = false,
         nameEnabled = false,
-        highlightEnabled = false,
         snaplineEnabled = false,
         snaplineMode = "Bottom",
         teamCheck = false,
+        whitelist = {},  -- List of player names to ignore (treat as teammates)
         boxColor = Color3.fromRGB(88, 196, 255),
         outlineColor = Color3.fromRGB(0, 0, 0),
         nameColor = Color3.fromRGB(255, 255, 255),
@@ -178,14 +200,11 @@ local ConfigData = {
         snaplineColor = Color3.fromRGB(88, 196, 255),
         distanceColor = Color3.fromRGB(200, 200, 200),
         healthBarColor = Color3.fromRGB(85, 255, 85),
-        highlightFillColor = Color3.fromRGB(88, 196, 255),
-        highlightOutlineColor = Color3.fromRGB(255, 255, 255),
-        highlightFillTransparency = 0.75,
-        highlightOutlineTransparency = 0,
     },
     aimbot = {
         enabled = false,
         teamCheck = false,
+        whitelist = {},  -- List of player names to ignore
         fov = 120,
         smoothness = 5,
         bodyAim = "Head",
@@ -200,7 +219,14 @@ local ConfigData = {
         triggerbotDelay = 50,
         triggerbotFov = 30,
     },
-    misc = {},
+    misc = {
+        nightmode = false,
+        nightmodeBrightness = 1,
+        nightmodePersist = true,
+        aspectRatioEnabled = false,
+        aspectRatioWidth = 16,
+        aspectRatioHeight = 9,
+    },
 }
 
 local function colorToTable(c)
@@ -212,6 +238,7 @@ local function tableToColor(t)
 end
 
 local function saveConfig()
+    ConfigData.aimbot.whitelist = ConfigData.esp.whitelist
     local dataToSave = {}
     
     -- Serialize each category
@@ -220,6 +247,12 @@ local function saveConfig()
         for key, value in pairs(settings) do
             if typeof(value) == "Color3" then
                 dataToSave[category][key] = colorToTable(value)
+            elseif type(value) == "table" then
+                -- Copy table values (for whitelist arrays)
+                dataToSave[category][key] = {}
+                for _, v in ipairs(value) do
+                    table.insert(dataToSave[category][key], v)
+                end
             else
                 dataToSave[category][key] = value
             end
@@ -263,6 +296,12 @@ local function loadConfig()
                 if ConfigData[category][key] ~= nil then
                     if type(value) == "table" and value.r and value.g and value.b then
                         ConfigData[category][key] = tableToColor(value)
+                    elseif type(value) == "table" and ConfigData[category][key] and type(ConfigData[category][key]) == "table" then
+                        -- Keep the table reference used by whitelist UI and runtime checks.
+                        table.clear(ConfigData[category][key])
+                        for _, item in ipairs(value) do
+                            table.insert(ConfigData[category][key], item)
+                        end
                     else
                         ConfigData[category][key] = value
                     end
@@ -270,32 +309,66 @@ local function loadConfig()
             end
         end
     end
+
+    -- ESP and Aimbot intentionally share one protected-player list.
+    ConfigData.aimbot.whitelist = ConfigData.esp.whitelist
     
     print("✅ [Config] Loaded from " .. CONFIG_FILE)
     return true
 end
 
 local function resetConfig()
+    -- Store current whitelist before reset
+    local currentEspWhitelist = ConfigData.esp.whitelist
+    
     ConfigData.esp = {
         enabled = false, boxEnabled = false, boxType = "Standard", outlineEnabled = true,
         skeletonEnabled = false, healthBarEnabled = false, distanceEnabled = false,
-        nameEnabled = false, highlightEnabled = false, snaplineEnabled = false,
-        snaplineMode = "Bottom", teamCheck = false,
+        nameEnabled = false, snaplineEnabled = false,
+        snaplineMode = "Bottom", teamCheck = false, whitelist = currentEspWhitelist,
         boxColor = Color3.fromRGB(88, 196, 255), outlineColor = Color3.fromRGB(0, 0, 0),
         nameColor = Color3.fromRGB(255, 255, 255), skeletonColor = Color3.fromRGB(255, 255, 255),
         snaplineColor = Color3.fromRGB(88, 196, 255), distanceColor = Color3.fromRGB(200, 200, 200),
-        healthBarColor = Color3.fromRGB(85, 255, 85), highlightFillColor = Color3.fromRGB(88, 196, 255),
-        highlightOutlineColor = Color3.fromRGB(255, 255, 255), highlightFillTransparency = 0.75,
-        highlightOutlineTransparency = 0,
+        healthBarColor = Color3.fromRGB(85, 255, 85),
     }
     ConfigData.aimbot = {
-        enabled = false, teamCheck = false, fov = 120, smoothness = 5, bodyAim = "Head",
+        enabled = false, teamCheck = false, whitelist = currentEspWhitelist, fov = 120, smoothness = 5, bodyAim = "Head",
         wallCheck = true, prediction = 0, stickyTarget = false, lookAtView = false,
         activationKey = "MouseButton2", showFov = true, fovColor = Color3.fromRGB(88, 196, 255),
         triggerbotEnabled = false, triggerbotDelay = 50, triggerbotFov = 30,
     }
-    ConfigData.misc = {}
-    print("🔄 [Config] Reset to defaults")
+    ConfigData.misc = {
+        nightmode = false,
+        nightmodeBrightness = 1,
+        nightmodePersist = true,
+        aspectRatioEnabled = false,
+        aspectRatioWidth = 16,
+        aspectRatioHeight = 9,
+    }
+    print("🔄 [Config] Reset to defaults (whitelist preserved)")
+end
+
+-- Cache friendship lookups so ESP never invokes a yielding API every frame.
+local friendCache = {}
+
+local function isFriend(player)
+    if not player or player == LocalPlayer then return false end
+    return friendCache[player.UserId] == true
+end
+
+local function cacheFriendship(player)
+    if not player or player == LocalPlayer then return end
+    local ok, result = pcall(function()
+        return LocalPlayer:IsFriendsWith(player.UserId)
+    end)
+    friendCache[player.UserId] = ok and result == true
+end
+
+local function isWhitelisted(player)
+    if not player or player == LocalPlayer then return true end
+    return isFriend(player)
+        or tableFind(ConfigData.esp.whitelist, player.Name)
+        or tableFind(ConfigData.aimbot.whitelist, player.Name)
 end
 
 -- ============================================
@@ -342,61 +415,77 @@ function UI:_createScreenGui()
 end
 
 function UI:_createMainFrame()
-    -- Improved main frame styling
+    -- Main frame with modern dark styling
     self.mainFrame = Instance.new("Frame")
     self.mainFrame.Name = "MainFrame"
-    self.mainFrame.Size = UDim2.new(0, 720, 0, 540)
-    self.mainFrame.Position = UDim2.new(0.5, -360, 0.5, -270)
+    self.mainFrame.Size = UDim2.new(0, 650, 0, 480)
+    self.mainFrame.Position = UDim2.new(0.5, -325, 0.5, -240)
     self.mainFrame.BackgroundColor3 = Colors.Background
     self.mainFrame.BorderSizePixel = 0
     self.mainFrame.Visible = false
-    self.mainFrame.BackgroundTransparency = 1
+    self.mainFrame.BackgroundTransparency = 0.3
     self.mainFrame.Parent = self.screenGui
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 14)
+    corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = self.mainFrame
 
-    -- Subtle gradient overlay on the background
+    -- Modern gradient background
     local bgGradient = Instance.new("UIGradient")
     bgGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 16, 26)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 14, 20)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 40)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 20, 35)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 30)),
     })
     bgGradient.Rotation = 135
     bgGradient.Parent = self.mainFrame
 
-    -- Border stroke
+    -- Border with accent color
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Colors.Border
-    stroke.Thickness = 1.5
-    stroke.Transparency = 0
+    stroke.Color = Color3.fromRGB(70, 70, 100)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.3
     stroke.Parent = self.mainFrame
 
-    -- Outer glow (shadow)
+    -- Subtle inner glow/border
+    local innerGlow = Instance.new("UIGradient")
+    innerGlow.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(Colors.Accent.R*255, Colors.Accent.G*255, Colors.Accent.B*255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 60, 90)),
+    })
+    innerGlow.Rotation = 0
+    
+    local stroke2 = Instance.new("UIStroke")
+    stroke2.Color = Colors.Accent
+    stroke2.Thickness = 1
+    stroke2.Transparency = 0.7
+    stroke2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke2.Parent = self.mainFrame
+
+    -- Outer shadow
     local shadow = Instance.new("ImageLabel")
     shadow.AnchorPoint = Vector2.new(0.5, 0.5)
     shadow.BackgroundTransparency = 1
     shadow.Position = UDim2.new(0.5, 0, 0.5, 8)
-    shadow.Size = UDim2.new(1, 60, 1, 60)
+    shadow.Size = UDim2.new(1, 50, 1, 50)
     shadow.ZIndex = -1
     shadow.Image = "rbxassetid://6014261993"
-    shadow.ImageColor3 = Colors.TextMuted
-    shadow.ImageTransparency = 0.88
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.75
     shadow.ScaleType = Enum.ScaleType.Slice
     shadow.SliceCenter = Rect.new(49, 49, 450, 450)
     shadow.Parent = self.mainFrame
 
-    -- Dark outer shadow
+    -- Dark shadow layer (used in open/close animations)
     local shadowDark = Instance.new("ImageLabel")
     shadowDark.AnchorPoint = Vector2.new(0.5, 0.5)
     shadowDark.BackgroundTransparency = 1
-    shadowDark.Position = UDim2.new(0.5, 0, 0.5, 12)
+    shadowDark.Position = UDim2.new(0.5, 0, 0.5, 16)
     shadowDark.Size = UDim2.new(1, 80, 1, 80)
     shadowDark.ZIndex = -2
     shadowDark.Image = "rbxassetid://6014261993"
-    shadowDark.ImageColor3 = Color3.new(0, 0, 0)
-    shadowDark.ImageTransparency = 0.7
+    shadowDark.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadowDark.ImageTransparency = 0.85
     shadowDark.ScaleType = Enum.ScaleType.Slice
     shadowDark.SliceCenter = Rect.new(49, 49, 450, 450)
     shadowDark.Parent = self.mainFrame
@@ -505,11 +594,11 @@ function UI:_setupDrag()
 end
 
 function UI:_createHeader()
-    -- Header background with gradient
+    -- Modern header with accent bar
     local header = Instance.new("Frame")
     header.Name = "Header"
-    header.Size = UDim2.new(1, 0, 0, 54)
-    header.BackgroundColor3 = Colors.BackgroundLight
+    header.Size = UDim2.new(1, 0, 0, 50)
+    header.BackgroundColor3 = Color3.fromRGB(28, 28, 45)
     header.BorderSizePixel = 0
     header.Parent = self.mainFrame
 
@@ -517,170 +606,132 @@ function UI:_createHeader()
     headerCorner.CornerRadius = UDim.new(0, 12)
     headerCorner.Parent = header
 
-    -- Gradient overlay on header
-    local headerGrad = Instance.new("UIGradient")
-    headerGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 20, 40)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(18, 18, 28)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 14, 22)),
+    -- Accent bar on left
+    local accentBar = Instance.new("Frame")
+    accentBar.Size = UDim2.new(0, 4, 0.8, 0)
+    accentBar.Position = UDim2.new(0, 10, 0.1, 0)
+    accentBar.BackgroundColor3 = Colors.Accent
+    accentBar.BorderSizePixel = 0
+    accentBar.Parent = header
+
+    local accentCorner = Instance.new("UICorner")
+    accentCorner.CornerRadius = UDim.new(0, 2)
+    accentCorner.Parent = accentBar
+
+    -- Accent glow
+    local accentGlow = Instance.new("UIGradient")
+    accentGlow.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(
+            math.clamp(math.floor(Colors.Accent.R*255) + 30, 0, 255),
+            math.clamp(math.floor(Colors.Accent.G*255) + 30, 0, 255),
+            math.clamp(math.floor(Colors.Accent.B*255) + 30, 0, 255)
+        )),
+        ColorSequenceKeypoint.new(1, Colors.Accent),
     })
-    headerGrad.Rotation = 90
-    headerGrad.Parent = header
+    accentGlow.Rotation = 90
+    accentGlow.Parent = accentBar
 
-    -- Fix bottom corners
-    local fix = Instance.new("Frame")
-    fix.Size = UDim2.new(1, 0, 0, 16)
-    fix.Position = UDim2.new(0, 0, 1, -16)
-    fix.BackgroundColor3 = Colors.BackgroundLight
-    fix.BorderSizePixel = 0
-    fix.Parent = header
-    local fixGrad = Instance.new("UIGradient")
-    fixGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 18, 28)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 14, 22)),
-    })
-    fixGrad.Rotation = 90
-    fixGrad.Parent = fix
-
-    -- Animated gradient bottom line
-    local gradientLine = Instance.new("Frame")
-    gradientLine.Size = UDim2.new(1, 0, 0, 2)
-    gradientLine.Position = UDim2.new(0, 0, 1, -2)
-    gradientLine.BackgroundColor3 = Color3.new(1, 1, 1)
-    gradientLine.BorderSizePixel = 0
-    gradientLine.Parent = header
-
-    local grad = Instance.new("UIGradient")
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0,    Colors.GradientStart),
-        ColorSequenceKeypoint.new(0.5,  Colors.GradientMid),
-        ColorSequenceKeypoint.new(1,    Colors.GradientEnd),
-    })
-    grad.Parent = gradientLine
-
-    -- Animated gradient rotation
-    task.spawn(function()
-        local rotation = 0
-        while self.mainFrame and self.mainFrame.Parent do
-            rotation = (rotation + 0.4) % 360
-            grad.Rotation = rotation
-            task.wait(0.03)
-        end
-    end)
-
-    -- Logo dot (glowing circle)
-    local logoDot = Instance.new("Frame")
-    logoDot.Size = UDim2.new(0, 10, 0, 10)
-    logoDot.Position = UDim2.new(0, 16, 0.5, -5)
-    logoDot.BackgroundColor3 = Colors.Accent
-    logoDot.BorderSizePixel = 0
-    logoDot.Parent = header
-    local dotCorner = Instance.new("UICorner")
-    dotCorner.CornerRadius = UDim.new(1, 0)
-    dotCorner.Parent = logoDot
-
-    -- Pulsing glow behind dot
-    local dotGlow = Instance.new("ImageLabel")
-    dotGlow.AnchorPoint = Vector2.new(0.5, 0.5)
-    dotGlow.BackgroundTransparency = 1
-    dotGlow.Position = UDim2.new(0, 21, 0.5, 0)
-    dotGlow.Size = UDim2.new(0, 28, 0, 28)
-    dotGlow.ZIndex = 0
-    dotGlow.Image = "rbxassetid://6014261993"
-    dotGlow.ImageColor3 = Colors.Accent
-    dotGlow.ImageTransparency = 0.7
-    dotGlow.ScaleType = Enum.ScaleType.Slice
-    dotGlow.SliceCenter = Rect.new(49, 49, 450, 450)
-    dotGlow.Parent = header
-
-    -- Pulse animation on dot
-    task.spawn(function()
-        local growing = true
-        while self.mainFrame and self.mainFrame.Parent do
-            local target = growing and 0.5 or 0.75
-            playTween(dotGlow, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {ImageTransparency = target})
-            growing = not growing
-            task.wait(0.9)
-        end
-    end)
-
-    -- Title (Minecraft style)
+    -- Title
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(0, 130, 1, 0)
-    title.Position = UDim2.new(0, 32, 0, 0)
+    title.Size = UDim2.new(0, 150, 1, 0)
+    title.Position = UDim2.new(0, 24, 0, 0)
     title.BackgroundTransparency = 1
     title.Text = "FCheat"
-    title.TextColor3 = Colors.Accent
+    title.TextColor3 = Colors.Text
     title.Font = MinecraftFonts.Title
-    title.TextSize = 18
+    title.TextSize = 20
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = header
-    applyMinecraftStyle(title, "Title")
 
-    -- Gradient on title text
-    local titleGrad = Instance.new("UIGradient")
-    titleGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Colors.Text),
-        ColorSequenceKeypoint.new(1, Colors.TextSecondary),
-    })
-    titleGrad.Rotation = 0
-    titleGrad.Parent = title
-
-    local version = Instance.new("TextLabel")
-    version.Size = UDim2.new(0, 40, 0, 18)
-    version.Position = UDim2.new(0, 130, 0.5, -9)
-    version.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    version.BackgroundTransparency = 0.2
-    version.BorderColor3 = Colors.Accent
-    version.BorderSizePixel = 2
-    version.Text = "v2.0"
-    version.TextColor3 = Colors.Accent
-    version.Font = MinecraftFonts.Pixel
-    version.TextSize = 10
+    -- Version tag
+    local version = Instance.new("Frame")
+    version.Size = UDim2.new(0, 38, 0, 16)
+    version.Position = UDim2.new(0, 150, 0.5, -8)
+    version.BackgroundColor3 = Colors.Accent
+    version.BackgroundTransparency = 0.85
+    version.BorderSizePixel = 0
     version.Parent = header
-    applyMinecraftStyle(version, "Code")
 
-    -- Minimize button (Minecraft style)
+    local versionCorner = Instance.new("UICorner")
+    versionCorner.CornerRadius = UDim.new(0, 4)
+    versionCorner.Parent = version
+
+    local versionLabel = Instance.new("TextLabel")
+    versionLabel.Size = UDim2.new(1, 0, 1, 0)
+    versionLabel.BackgroundTransparency = 1
+    versionLabel.Text = "v2.0"
+    versionLabel.TextColor3 = Colors.Text
+    versionLabel.Font = MinecraftFonts.Pixel
+    versionLabel.TextSize = 10
+    versionLabel.Parent = version
+
+    -- Minimize button
     local minBtn = Instance.new("TextButton")
-    minBtn.Size = UDim2.new(0, 28, 0, 28)
-    minBtn.Position = UDim2.new(1, -70, 0.5, -14)
-    minBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    minBtn.BorderColor3 = Colors.Warning
-    minBtn.BorderSizePixel = 2
-    minBtn.Text = "-"
-    minBtn.TextColor3 = Colors.Warning
-    minBtn.Font = MinecraftFonts.Title
-    minBtn.TextSize = 20
+    minBtn.Size = UDim2.new(0, 32, 0, 32)
+    minBtn.Position = UDim2.new(1, -80, 0.5, -16)
+    minBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+    minBtn.BackgroundTransparency = 0.3
+    minBtn.BorderSizePixel = 0
+    minBtn.Text = "−"
+    minBtn.TextColor3 = Colors.TextSecondary
+    minBtn.Font = MinecraftFonts.Header
+    minBtn.TextSize = 18
+    minBtn.AutoButtonColor = false
     minBtn.Parent = header
-    applyMinecraftStyle(minBtn, "Header")
+
+    local minCorner = Instance.new("UICorner")
+    minCorner.CornerRadius = UDim.new(0, 8)
+    minCorner.Parent = minBtn
+
     self:_connect(minBtn.MouseEnter, function()
-        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Warning, TextColor3 = Colors.Text, BorderColor3 = Colors.Text})
+        playTween(minBtn, TweenInfo_Fast, {
+            BackgroundTransparency = 0,
+            BackgroundColor3 = Colors.Warning,
+            TextColor3 = Colors.Text
+        })
     end)
     self:_connect(minBtn.MouseLeave, function()
-        playTween(minBtn, TweenInfo_Fast, {BackgroundColor3 = Color3.fromRGB(0,0,0), TextColor3 = Colors.Warning, BorderColor3 = Colors.Warning})
+        playTween(minBtn, TweenInfo_Fast, {
+            BackgroundTransparency = 0.3,
+            BackgroundColor3 = Color3.fromRGB(50, 50, 65),
+            TextColor3 = Colors.TextSecondary
+        })
     end)
     self:_connect(minBtn.MouseButton1Click, function()
         self:SetVisible(false)
     end)
 
-    -- Close button (Minecraft style)
+    -- Close button
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 28, 0, 28)
-    closeBtn.Position = UDim2.new(1, -36, 0.5, -14)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    closeBtn.BorderColor3 = Colors.Danger
-    closeBtn.BorderSizePixel = 2
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Colors.Danger
-    closeBtn.Font = MinecraftFonts.Title
-    closeBtn.TextSize = 18
+    closeBtn.Size = UDim2.new(0, 32, 0, 32)
+    closeBtn.Position = UDim2.new(1, -42, 0.5, -16)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+    closeBtn.BackgroundTransparency = 0.3
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Colors.TextSecondary
+    closeBtn.Font = MinecraftFonts.Header
+    closeBtn.TextSize = 14
+    closeBtn.AutoButtonColor = false
     closeBtn.Parent = header
-    applyMinecraftStyle(closeBtn, "Header")
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = closeBtn
+
     self:_connect(closeBtn.MouseEnter, function()
-        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Danger, TextColor3 = Colors.Text, BorderColor3 = Colors.Text})
+        playTween(closeBtn, TweenInfo_Fast, {
+            BackgroundTransparency = 0,
+            BackgroundColor3 = Colors.Danger,
+            TextColor3 = Colors.Text
+        })
     end)
     self:_connect(closeBtn.MouseLeave, function()
-        playTween(closeBtn, TweenInfo_Fast, {BackgroundColor3 = Color3.fromRGB(0,0,0), TextColor3 = Colors.Danger, BorderColor3 = Colors.Danger})
+        playTween(closeBtn, TweenInfo_Fast, {
+            BackgroundTransparency = 0.3,
+            BackgroundColor3 = Color3.fromRGB(50, 50, 65),
+            TextColor3 = Colors.TextSecondary
+        })
     end)
     self:_connect(closeBtn.MouseButton1Click, function()
         self:SetVisible(false)
@@ -763,7 +814,7 @@ function UI:AddTab(name)
     iconLabel.TextSize = 12
     iconLabel.TextXAlignment = Enum.TextXAlignment.Left
     iconLabel.Parent = btn
-    applyMinecraftStyle(iconLabel, "Pixel")
+    -- Removed applyMinecraftStyle to preserve TextMuted color
 
     -- Text label (Minecraft style)
     local textLabel = Instance.new("TextLabel")
@@ -776,7 +827,7 @@ function UI:AddTab(name)
     textLabel.TextSize = 12
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.Parent = btn
-    applyMinecraftStyle(textLabel, "Header")
+    -- Removed applyMinecraftStyle to preserve TextMuted color
 
     -- Active indicator bar at bottom
     local indicator = Instance.new("Frame")
@@ -947,34 +998,33 @@ end
 -- ============================================
 -- UI ELEMENTS
 -- ============================================
-function UI:CreateToggle(parent, text, default, callback)
+function UI:CreateToggle(parent, text, default, callback, keybindConfig)
     local toggle = Instance.new("Frame")
-    toggle.Size = UDim2.new(1, 0, 0, 28)
-    toggle.BackgroundColor3 = Colors.BackgroundLighter
-    toggle.BackgroundTransparency = 1
+    toggle.Size = UDim2.new(1, 0, 0, 32)
+    toggle.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    toggle.BackgroundTransparency = 0.3
     toggle.BorderSizePixel = 0
     toggle.Parent = parent
 
     local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 4)
+    toggleCorner.CornerRadius = UDim.new(0, 8)
     toggleCorner.Parent = toggle
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -60, 1, 0)
-    label.Position = UDim2.new(0, 6, 0, 0)
+    label.Size = UDim2.new(1, -70, 1, 0)
+    label.Position = UDim2.new(0, 12, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = text
-    label.TextColor3 = Colors.TextSecondary
+    label.TextColor3 = Colors.Text
     label.Font = MinecraftFonts.Minecraft
-    label.TextSize = 12
+    label.TextSize = 13
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggle
-    -- Don't applyMinecraftStyle - keeps text readable on dark background
 
     local switch = Instance.new("Frame")
-    switch.Size = UDim2.new(0, 36, 0, 18)
-    switch.Position = UDim2.new(1, -42, 0.5, -9)
-    switch.BackgroundColor3 = Colors.BackgroundLighter
+    switch.Size = UDim2.new(0, 44, 0, 22)
+    switch.Position = UDim2.new(1, -110, 0.5, -11)
+    switch.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
     switch.BorderSizePixel = 0
     switch.Parent = toggle
 
@@ -982,15 +1032,10 @@ function UI:CreateToggle(parent, text, default, callback)
     switchCorner.CornerRadius = UDim.new(1, 0)
     switchCorner.Parent = switch
 
-    local switchStroke = Instance.new("UIStroke")
-    switchStroke.Color = Colors.Border
-    switchStroke.Thickness = 1
-    switchStroke.Parent = switch
-
     local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 14, 0, 14)
-    knob.Position = UDim2.new(0, 2, 0.5, -7)
-    knob.BackgroundColor3 = Colors.TextMuted
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = UDim2.new(0, 2, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
     knob.BorderSizePixel = 0
     knob.Parent = switch
 
@@ -998,21 +1043,43 @@ function UI:CreateToggle(parent, text, default, callback)
     knobCorner.CornerRadius = UDim.new(1, 0)
     knobCorner.Parent = knob
 
+    -- Glow effect for enabled state
+    local glow = Instance.new("ImageLabel")
+    glow.Size = UDim2.new(1, 8, 1, 8)
+    glow.Position = UDim2.new(-4, -4, -4, -4)
+    glow.BackgroundTransparency = 1
+    glow.Image = "rbxassetid://4912607387"
+    glow.ImageColor3 = Color3.fromRGB(100, 180, 255)
+    glow.ImageTransparency = 0.85
+    glow.ScaleType = Enum.ScaleType.Slice
+    glow.SliceCenter = Rect.new(20, 20, 220, 220)
+    glow.Visible = false
+    glow.Parent = switch
+
     local state = default or false
 
     local function update(v, silent)
         state = v
+        local enabledColor = Color3.fromRGB(88, 196, 255)  -- Nice blue
+        local disabledColor = Color3.fromRGB(60, 60, 75)
+        local knobColorOn = Color3.fromRGB(255, 255, 255)
+        local knobColorOff = Color3.fromRGB(180, 180, 180)
+        
         playTween(switch, TweenInfo_Fast, {
-            BackgroundColor3 = v and Colors.Accent or Colors.BackgroundLighter
-        })
-        playTween(switchStroke, TweenInfo_Fast, {
-            Color = v and Colors.AccentDark or Colors.Border
+            BackgroundColor3 = v and enabledColor or disabledColor
         })
         playTween(knob, TweenInfo_Fast, {
-            Position = v and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
-            BackgroundColor3 = v and Colors.Text or Colors.TextMuted
+            Position = v and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
+            BackgroundColor3 = v and knobColorOn or knobColorOff
         })
-        playTween(label, TweenInfo_Fast, {TextColor3 = v and Colors.Text or Colors.TextSecondary})
+        playTween(label, TweenInfo_Fast, {
+            TextColor3 = v and Colors.Text or Colors.TextSecondary
+        })
+        
+        -- Show/hide glow
+        glow.Visible = v
+        glow.ImageColor3 = enabledColor
+        
         if not silent and callback then callback(v) end
     end
 
@@ -1027,20 +1094,34 @@ function UI:CreateToggle(parent, text, default, callback)
 
     self:_connect(btn.MouseEnter, function()
         if not state then
-            playTween(toggle, TweenInfo_Fast, {BackgroundTransparency = 0.85})
+            playTween(toggle, TweenInfo_Fast, {
+                BackgroundTransparency = 0.15,
+                BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+            })
+        else
+            playTween(toggle, TweenInfo_Fast, {
+                BackgroundTransparency = 0.2,
+                BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+            })
         end
     end)
+    
     self:_connect(btn.MouseLeave, function()
         if not state then
-            playTween(toggle, TweenInfo_Fast, {BackgroundTransparency = 1})
+            playTween(toggle, TweenInfo_Fast, {
+                BackgroundTransparency = 0.3,
+                BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+            })
+        else
+            playTween(toggle, TweenInfo_Fast, {
+                BackgroundTransparency = 0.25,
+                BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+            })
         end
     end)
 
     self:_connect(btn.MouseButton1Click, function()
         update(not state, false)
-        if state then
-            playTween(toggle, TweenInfo_Fast, {BackgroundTransparency = 1})
-        end
     end)
 
     return {
@@ -1049,42 +1130,208 @@ function UI:CreateToggle(parent, text, default, callback)
     }
 end
 
+-- KEYBIND PICKER
+-- ============================================
+function UI:CreateKeybindPicker(parent, text, defaultKey, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 32)
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.Position = UDim2.new(0, 12, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Colors.Text
+    label.Font = MinecraftFonts.Minecraft
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+    
+    local keybindBtn = Instance.new("TextButton")
+    keybindBtn.Size = UDim2.new(0, 80, 0, 24)
+    keybindBtn.Position = UDim2.new(0.5, 30, 0.5, -12)
+    keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    keybindBtn.BorderSizePixel = 0
+    keybindBtn.Text = defaultKey or "None"
+    keybindBtn.TextColor3 = Colors.Text
+    keybindBtn.Font = MinecraftFonts.Header
+    keybindBtn.TextSize = 12
+    keybindBtn.Parent = container
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = keybindBtn
+    
+    local btnStroke = Instance.new("UIStroke")
+    btnStroke.Color = Colors.Border
+    btnStroke.Thickness = 1
+    btnStroke.Parent = keybindBtn
+    
+    -- Always on toggle
+    local alwaysOnToggle = Instance.new("Frame")
+    alwaysOnToggle.Size = UDim2.new(0, 60, 0, 24)
+    alwaysOnToggle.Position = UDim2.new(1, -70, 0.5, -12)
+    alwaysOnToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
+    alwaysOnToggle.BorderSizePixel = 0
+    alwaysOnToggle.Parent = container
+    
+    local alwaysOnCorner = Instance.new("UICorner")
+    alwaysOnCorner.CornerRadius = UDim.new(0, 6)
+    alwaysOnCorner.Parent = alwaysOnToggle
+    
+    local alwaysOnLabel = Instance.new("TextLabel")
+    alwaysOnLabel.Size = UDim2.new(1, 0, 1, 0)
+    alwaysOnLabel.BackgroundTransparency = 1
+    alwaysOnLabel.Text = "Always"
+    alwaysOnLabel.TextColor3 = Colors.TextSecondary
+    alwaysOnLabel.Font = MinecraftFonts.Minecraft
+    alwaysOnLabel.TextSize = 10
+    alwaysOnLabel.Parent = alwaysOnToggle
+    
+    local alwaysOnKnob = Instance.new("Frame")
+    alwaysOnKnob.Size = UDim2.new(0, 18, 0, 18)
+    alwaysOnKnob.Position = UDim2.new(0, 2, 0.5, -9)
+    alwaysOnKnob.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+    alwaysOnKnob.BorderSizePixel = 0
+    alwaysOnKnob.Parent = alwaysOnToggle
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = alwaysOnKnob
+    
+    local alwaysOnState = false
+    local currentKey = defaultKey or "None"
+    local isListening = false
+    
+    local function updateAlwaysOn(v)
+        alwaysOnState = v
+        local enabledColor = Color3.fromRGB(88, 196, 255)
+        local disabledColor = Color3.fromRGB(60, 60, 75)
+        
+        playTween(alwaysOnToggle, TweenInfo_Fast, {
+            BackgroundColor3 = v and enabledColor or disabledColor
+        })
+        playTween(alwaysOnKnob, TweenInfo_Fast, {
+            Position = v and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
+            BackgroundColor3 = v and Color3.new(1, 1, 1) or Color3.fromRGB(180, 180, 180)
+        })
+        alwaysOnLabel.TextColor3 = v and Colors.Text or Colors.TextSecondary
+        
+        if callback and callback.onAlwaysOnChange then
+            callback.onAlwaysOnChange(v)
+        end
+    end
+    
+    self:_connect(alwaysOnToggle.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            updateAlwaysOn(not alwaysOnState)
+        end
+    end)
+    
+    local function startKeyListen()
+        isListening = true
+        keybindBtn.Text = "Press key..."
+        keybindBtn.BackgroundColor3 = Color3.fromRGB(88, 196, 255)
+        
+        local connection
+        connection = Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            
+            local key = input.KeyCode == Enum.KeyCode.Unknown and input.UserInputType or input.KeyCode
+            local keyName = input.KeyCode.Name
+            
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                keyName = "Mouse1"
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                keyName = "Mouse2"
+            elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+                keyName = "Mouse3"
+            end
+            
+            if keyName and keyName ~= "Unknown" then
+                currentKey = keyName
+                keybindBtn.Text = keyName
+                keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+                isListening = false
+                
+                if callback and callback.onKeyChange then
+                    callback.onKeyChange(keyName)
+                end
+                
+                connection:Disconnect()
+            end
+        end)
+        
+        task.delay(5, function()
+            if isListening then
+                isListening = false
+                keybindBtn.Text = currentKey
+                keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+                connection:Disconnect()
+            end
+        end)
+    end
+    
+    self:_connect(keybindBtn.MouseButton1Click, function()
+        if not isListening then
+            startKeyListen()
+        end
+    end)
+    
+    return {
+        SetKey = function(_, key)
+            currentKey = key or "None"
+            keybindBtn.Text = currentKey
+        end,
+        GetKey = function() return currentKey end,
+        SetAlwaysOn = function(_, v) updateAlwaysOn(v) end,
+        IsAlwaysOn = function() return alwaysOnState end
+    }
+end
+
 function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     suffix = suffix or ""
     local current = default
 
     local slider = Instance.new("Frame")
-    slider.Size = UDim2.new(1, 0, 0, 44)
-    slider.BackgroundTransparency = 1
+    slider.Size = UDim2.new(1, 0, 0, 48)
+    slider.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+    slider.BackgroundTransparency = 0.4
+    slider.BorderSizePixel = 0
     slider.Parent = parent
 
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 8)
+    sliderCorner.Parent = slider
+
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.6, 0, 0, 18)
-    label.Position = UDim2.new(0, 6, 0, 0)
+    label.Size = UDim2.new(0.6, 0, 0, 20)
+    label.Position = UDim2.new(0, 12, 0, 4)
     label.BackgroundTransparency = 1
     label.Text = text
-    label.TextColor3 = Colors.TextSecondary
+    label.TextColor3 = Colors.Text
     label.Font = MinecraftFonts.Minecraft
-    label.TextSize = 12
+    label.TextSize = 13
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = slider
-    -- Don't applyMinecraftStyle - keeps text readable on dark background
 
     local valueLabel = Instance.new("TextLabel")
-    valueLabel.Size = UDim2.new(0.4, -6, 0, 18)
-    valueLabel.Position = UDim2.new(0.6, 0, 0, 0)
+    valueLabel.Size = UDim2.new(0.35, -12, 0, 20)
+    valueLabel.Position = UDim2.new(0.65, 0, 0, 4)
     valueLabel.BackgroundTransparency = 1
     valueLabel.Text = tostring(default) .. suffix
-    valueLabel.TextColor3 = Colors.AccentLight  -- Use lighter color instead of black
+    valueLabel.TextColor3 = Colors.Accent
     valueLabel.Font = MinecraftFonts.Header
-    valueLabel.TextSize = 12
+    valueLabel.TextSize = 13
     valueLabel.TextXAlignment = Enum.TextXAlignment.Right
     valueLabel.Parent = slider
 
     local trackBg = Instance.new("Frame")
-    trackBg.Size = UDim2.new(1, -12, 0, 6)
-    trackBg.Position = UDim2.new(0, 6, 0, 30)
-    trackBg.BackgroundColor3 = Colors.BackgroundLighter
+    trackBg.Size = UDim2.new(1, -20, 0, 6)
+    trackBg.Position = UDim2.new(0, 10, 0, 36)
+    trackBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
     trackBg.BorderSizePixel = 0
     trackBg.Parent = slider
 
@@ -1102,9 +1349,22 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     fillCorner.CornerRadius = UDim.new(1, 0)
     fillCorner.Parent = fill
 
-    -- Drag handle dot
+    -- Glow on fill
+    local fillGlow = Instance.new("UIGradient")
+    fillGlow.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(
+            math.clamp(math.floor(Colors.Accent.R*255) + 30, 0, 255),
+            math.clamp(math.floor(Colors.Accent.G*255) + 30, 0, 255),
+            math.clamp(math.floor(Colors.Accent.B*255) + 30, 0, 255)
+        )),
+        ColorSequenceKeypoint.new(1, Colors.Accent),
+    })
+    fillGlow.Rotation = 0
+    fillGlow.Parent = fill
+
+    -- Drag handle
     local handle = Instance.new("Frame")
-    handle.Size = UDim2.new(0, 12, 0, 12)
+    handle.Size = UDim2.new(0, 16, 0, 16)
     handle.AnchorPoint = Vector2.new(0.5, 0.5)
     handle.Position = UDim2.new(math.clamp((default - min) / (max - min), 0, 1), 0, 0.5, 0)
     handle.BackgroundColor3 = Colors.Text
@@ -1116,9 +1376,21 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     handleCorner.CornerRadius = UDim.new(1, 0)
     handleCorner.Parent = handle
 
+    -- Handle shadow glow
+    local handleGlow = Instance.new("ImageLabel")
+    handleGlow.Size = UDim2.new(1, 8, 1, 8)
+    handleGlow.Position = UDim2.new(-4, -4, -4, -4)
+    handleGlow.BackgroundTransparency = 1
+    handleGlow.Image = "rbxassetid://4912607387"
+    handleGlow.ImageColor3 = Colors.Accent
+    handleGlow.ImageTransparency = 0.7
+    handleGlow.ScaleType = Enum.ScaleType.Slice
+    handleGlow.SliceCenter = Rect.new(20, 20, 220, 220)
+    handleGlow.Parent = handle
+
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 1, 16)
-    btn.Position = UDim2.new(0, 0, 0, -8)
+    btn.Size = UDim2.new(1, -4, 1, 4)
+    btn.Position = UDim2.new(0, 2, 0, -2)
     btn.BackgroundTransparency = 1
     btn.Text = ""
     btn.ZIndex = 3
@@ -1137,14 +1409,17 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     end
 
     self:_connect(btn.MouseEnter, function()
-        playTween(handle, TweenInfo_Fast, {Size = UDim2.new(0, 14, 0, 14), BackgroundColor3 = Colors.Accent})
+        playTween(handle, TweenInfo_Fast, {Size = UDim2.new(0, 18, 0, 18)})
+        playTween(handleGlow, TweenInfo_Fast, {ImageTransparency = 0.5})
         playTween(fill, TweenInfo_Fast, {BackgroundColor3 = Colors.AccentLight})
     end)
+    
     self:_connect(btn.MouseLeave, function()
         if not dragging then
-            playTween(handle, TweenInfo_Fast, {Size = UDim2.new(0, 12, 0, 12), BackgroundColor3 = Colors.Text})
-            playTween(fill, TweenInfo_Fast, {BackgroundColor3 = Colors.Accent})
+            playTween(handle, TweenInfo_Fast, {Size = UDim2.new(0, 16, 0, 16)})
+            playTween(handleGlow, TweenInfo_Fast, {ImageTransparency = 0.7})
         end
+        playTween(fill, TweenInfo_Fast, {BackgroundColor3 = Colors.Accent})
     end)
 
     self:_connect(btn.InputBegan, function(input)
@@ -1163,8 +1438,8 @@ function UI:CreateSlider(parent, text, min, max, default, callback, suffix)
     self:_connect(Services.UserInputService.InputEnded, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then
             dragging = false
-            playTween(handle, TweenInfo_Fast, {Size = UDim2.new(0, 12, 0, 12), BackgroundColor3 = Colors.Text})
-            playTween(fill, TweenInfo_Fast, {BackgroundColor3 = Colors.Accent})
+            playTween(handle, TweenInfo_Fast, {Size = UDim2.new(0, 16, 0, 16)})
+            playTween(handleGlow, TweenInfo_Fast, {ImageTransparency = 0.7})
         end
     end)
 
@@ -1241,7 +1516,7 @@ function UI:CreateDropdown(parent, text, options, default, callback)
     arrow.TextSize = 10
     arrow.ZIndex = 11
     arrow.Parent = box
-    applyMinecraftStyle(arrow, "Header", 10)
+    -- Removed applyMinecraftStyle to preserve Accent color
 
     -- List is parented to ScreenGui to escape clipping
     local listHeight = math.min(#options, 6) * 28 + 8
@@ -1453,7 +1728,7 @@ function UI:CreateColorPicker(parent, text, default, category, key, callback)
     rgbLabel.BackgroundTransparency = 1
     rgbLabel.Text = string.format("R%d G%d B%d", math.floor(default.R*255), math.floor(default.G*255), math.floor(default.B*255))
     rgbLabel.TextColor3 = Colors.TextMuted
-    rgbLabel.Font = MinecraftFonts.Code
+    rgbLabel.Font = Enum.Font.SourceSans
     rgbLabel.TextSize = 10
     rgbLabel.TextXAlignment = Enum.TextXAlignment.Right
     rgbLabel.Parent = picker
@@ -1756,6 +2031,499 @@ function UI:CreateColorPicker(parent, text, default, category, key, callback)
     }
 end
 
+function UI:CreateWhitelistList(parent, whitelist, callback)
+    local listHeight = 220
+    local fetchedFriendNames = {}
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, listHeight)
+    container.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    container.BorderSizePixel = 0
+    container.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = container
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Colors.Border
+    stroke.Thickness = 1
+    stroke.Parent = container
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -12, 0, 16)
+    label.Position = UDim2.new(0, 6, 0, 4)
+    label.BackgroundTransparency = 1
+    label.Text = "Protected Players"
+    label.TextColor3 = Colors.TextSecondary
+    label.Font = MinecraftFonts.Header
+    label.TextSize = 10
+    label.Parent = container
+    
+    -- Add every Roblox friend to the protected list in one click.
+    local filterBtn = Instance.new("TextButton")
+    filterBtn.Size = UDim2.new(1, -12, 0, 20)
+    filterBtn.Position = UDim2.new(0, 6, 0, 20)
+    filterBtn.BackgroundColor3 = Colors.BackgroundHover
+    filterBtn.BorderSizePixel = 0
+    filterBtn.Text = "Sync Online Friends"
+    filterBtn.TextColor3 = Colors.TextSecondary
+    filterBtn.Font = MinecraftFonts.Body
+    filterBtn.TextSize = 11
+    filterBtn.AutoButtonColor = false
+    filterBtn.Parent = container
+    
+    local filterCorner = Instance.new("UICorner")
+    filterCorner.CornerRadius = UDim.new(0, 4)
+    filterCorner.Parent = filterBtn
+
+    local list = Instance.new("ScrollingFrame")
+    list.Name = "WhitelistList"
+    list.Size = UDim2.new(1, -8, 0, 112)
+    list.Position = UDim2.new(0, 4, 0, 44)
+    list.BackgroundTransparency = 1
+    list.ScrollBarThickness = 3
+    list.ScrollBarImageColor3 = Colors.Accent
+    list.ScrollBarImageTransparency = 0.5
+    list.CanvasSize = UDim2.new(0, 0, 0, 0)
+    list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    list.Parent = container
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 4)
+    listLayout.Parent = list
+
+    local framePadding = Instance.new("UIPadding")
+    framePadding.PaddingTop = UDim.new(0, 4)
+    framePadding.PaddingBottom = UDim.new(0, 4)
+    framePadding.PaddingLeft = UDim.new(0, 6)
+    framePadding.PaddingRight = UDim.new(0, 6)
+    framePadding.Parent = list
+
+    -- AutoComplete dropdown for suggestions
+    local autoCompleteDropdown = Instance.new("Frame")
+    autoCompleteDropdown.Size = UDim2.new(0, 0, 0, 0)
+    autoCompleteDropdown.BackgroundColor3 = Colors.BackgroundLight
+    autoCompleteDropdown.BorderSizePixel = 0
+    autoCompleteDropdown.Visible = false
+    autoCompleteDropdown.ZIndex = 100
+    autoCompleteDropdown.Parent = self.screenGui
+
+    local autoCorner = Instance.new("UICorner")
+    autoCorner.CornerRadius = UDim.new(0, 4)
+    autoCorner.Parent = autoCompleteDropdown
+
+    local autoStroke = Instance.new("UIStroke")
+    autoStroke.Color = Colors.Accent
+    autoStroke.Thickness = 1
+    autoStroke.Transparency = 0.6
+    autoStroke.Parent = autoCompleteDropdown
+
+    local autoCompleteLayout = Instance.new("UIListLayout")
+    autoCompleteLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    autoCompleteLayout.Padding = UDim.new(0, 2)
+    autoCompleteLayout.Parent = autoCompleteDropdown
+
+    local autoCompletePadding = Instance.new("UIPadding")
+    autoCompletePadding.PaddingTop = UDim.new(0, 4)
+    autoCompletePadding.PaddingBottom = UDim.new(0, 4)
+    autoCompletePadding.PaddingLeft = UDim.new(0, 6)
+    autoCompletePadding.PaddingRight = UDim.new(0, 6)
+    autoCompletePadding.Parent = autoCompleteDropdown
+
+    -- Manual input field for adding players by name
+    local inputContainer = Instance.new("Frame")
+    inputContainer.Size = UDim2.new(1, 0, 0, 28)
+    inputContainer.Position = UDim2.new(0, 0, 0, 166)
+    inputContainer.BackgroundColor3 = Colors.BackgroundLighter
+    inputContainer.BorderSizePixel = 0
+    inputContainer.Parent = container
+
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 4)
+    inputCorner.Parent = inputContainer
+
+    local inputStroke = Instance.new("UIStroke")
+    inputStroke.Color = Colors.Border
+    inputStroke.Thickness = 1
+    inputStroke.Parent = inputContainer
+
+    local inputField = Instance.new("TextBox")
+    inputField.Size = UDim2.new(1, -50, 1, 0)
+    inputField.Position = UDim2.new(0, 6, 0, 0)
+    inputField.BackgroundColor3 = Colors.BackgroundLight
+    inputField.BorderSizePixel = 0
+    inputField.Text = "Enter player name..."
+    inputField.TextColor3 = Colors.TextMuted
+    inputField.Font = MinecraftFonts.Body
+    inputField.TextSize = 11
+    inputField.Parent = inputContainer
+    inputField.ClearTextOnFocus = false
+
+    local addBtn = Instance.new("TextButton")
+    addBtn.Size = UDim2.new(0, 40, 1, 0)
+    addBtn.Position = UDim2.new(1, -42, 0, 0)
+    addBtn.BackgroundColor3 = Colors.Accent
+    addBtn.BorderSizePixel = 0
+    addBtn.Text = "Add"
+    addBtn.TextColor3 = Colors.Text
+    addBtn.Font = MinecraftFonts.Header
+    addBtn.TextSize = 11
+    addBtn.AutoButtonColor = false
+    addBtn.Parent = inputContainer
+
+    local addCorner = Instance.new("UICorner")
+    addCorner.CornerRadius = UDim.new(0, 3)
+    addCorner.Parent = addBtn
+
+    -- Notification label for Add/Remove events
+    local notifyLabel = Instance.new("TextLabel")
+    notifyLabel.Size = UDim2.new(1, -12, 0, 20)
+    notifyLabel.Position = UDim2.new(0, 6, 0, listHeight - 54)
+    notifyLabel.BackgroundTransparency = 1
+    notifyLabel.TextColor3 = Colors.Text
+    notifyLabel.Font = MinecraftFonts.Body
+    notifyLabel.TextSize = 11
+    notifyLabel.TextXAlignment = Enum.TextXAlignment.Center
+    notifyLabel.Parent = container
+
+    local function showNotification(text, duration)
+        notifyLabel.Text = text
+        task.delay(duration or 2, function()
+            notifyLabel.Text = ""
+        end)
+    end
+
+    local renderList
+
+    local function addPlayerByName(playerName)
+        local trimmedName = playerName:Trim()
+        
+        -- Validate name is not empty
+        if trimmedName == "" then
+            showNotification("Please enter a player name", 2)
+            return
+        end
+        
+        -- Check if already in whitelist
+        if tableFind(whitelist, trimmedName) then
+            showNotification(trimmedName .. " is already in whitelist", 2)
+            return
+        end
+        
+        -- Validate name exists on server
+        local players = Services.Players:GetPlayers()
+        local found = false
+        for _, player in ipairs(players) do
+            if player.Name == trimmedName then
+                found = true
+                break
+            end
+        end
+        
+        if not found then
+            showNotification("Player '" .. trimmedName .. "' not found on server", 2)
+            return
+        end
+        
+        -- Add to whitelist
+        table.insert(whitelist, trimmedName)
+        callback(whitelist)
+        saveConfig()
+        showNotification(trimmedName .. " added to whitelist")
+        inputField.Text = "Enter player name..."
+        renderList()
+    end
+
+    -- Connect input events
+    self:_connect(inputField.FocusLost, function(enterPressed)
+        if enterPressed then
+            addPlayerByName(inputField.Text)
+        end
+    end)
+
+    self:_connect(addBtn.MouseButton1Click, function()
+        addPlayerByName(inputField.Text)
+    end)
+    
+    -- Input field hover effects
+    self:_connect(inputField.MouseEnter, function()
+        playTween(inputContainer, TweenInfo_Fast, {BackgroundTransparency = 0.2, BackgroundColor3 = Colors.BackgroundHover})
+    end)
+    self:_connect(inputField.MouseLeave, function()
+        playTween(inputContainer, TweenInfo_Fast, {BackgroundTransparency = 0.98, BackgroundColor3 = Colors.BackgroundLighter})
+    end)
+    
+    self:_connect(addBtn.MouseEnter, function()
+        playTween(addBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.AccentLight})
+    end)
+    self:_connect(addBtn.MouseLeave, function()
+        playTween(addBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Accent})
+    end)
+    
+    local refreshButton = Instance.new("TextButton")
+    refreshButton.Size = UDim2.new(1, 0, 0, 24)
+    refreshButton.Position = UDim2.new(0, 0, 0, 196)
+    refreshButton.BackgroundColor3 = Colors.BackgroundHover
+    refreshButton.BorderSizePixel = 0
+    refreshButton.Text = "Refresh"
+    refreshButton.TextColor3 = Colors.Text
+    refreshButton.Font = MinecraftFonts.Body
+    refreshButton.TextSize = 11
+    refreshButton.Parent = container
+
+    local refreshCorner = Instance.new("UICorner")
+    refreshCorner.CornerRadius = UDim.new(0, 4)
+    refreshCorner.Parent = refreshButton
+    
+    self:_connect(filterBtn.MouseButton1Click, function()
+        filterBtn.Text = "Loading Friends..."
+        filterBtn.Active = false
+
+        task.spawn(function()
+            local syncedNames = {}
+            local syncedSet = {}
+            local checked = 0
+
+            for _, player in ipairs(Services.Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    cacheFriendship(player)
+                    checked = checked + 1
+                    if isFriend(player) then
+                        syncedSet[player.Name:lower()] = true
+                        table.insert(syncedNames, player.Name)
+                    end
+                end
+            end
+
+            for _, name in ipairs(syncedNames) do
+                if not tableFind(whitelist, name) then
+                    table.insert(whitelist, name)
+                end
+            end
+            fetchedFriendNames = syncedSet
+            ConfigData.aimbot.whitelist = whitelist
+            callback(whitelist)
+            saveConfig()
+            renderList()
+            showNotification(string.format("Found %d online friends", #syncedNames), 2)
+
+            filterBtn.Text = "Sync Online Friends"
+            filterBtn.Active = true
+        end)
+    end)
+    
+    -- Notification label for Add/Remove events
+    local notifyLabel = Instance.new("TextLabel")
+    notifyLabel.Size = UDim2.new(1, -12, 0, 20)
+    notifyLabel.Position = UDim2.new(0, 6, 0, listHeight - 54)
+    notifyLabel.BackgroundTransparency = 1
+    notifyLabel.TextColor3 = Colors.Text
+    notifyLabel.Font = MinecraftFonts.Body
+    notifyLabel.TextSize = 11
+    notifyLabel.TextXAlignment = Enum.TextXAlignment.Center
+    notifyLabel.Parent = container
+
+    local function showNotification(text, duration)
+        notifyLabel.Text = text
+        task.delay(duration or 2, function()
+            notifyLabel.Text = ""
+        end)
+    end
+
+    renderList = function()
+        -- Keep the layout and padding; destroying them makes every row overlap.
+        for _, child in ipairs(list:GetChildren()) do
+            if child:IsA("GuiObject") then
+                child:Destroy()
+            end
+        end
+
+        for _, name in ipairs(whitelist) do
+            local onlinePlayer = Services.Players:FindFirstChild(name)
+            if not onlinePlayer then continue end
+
+            local item = Instance.new("Frame")
+            item.Size = UDim2.new(1, 0, 0, 28)
+            item.BackgroundColor3 = Colors.BackgroundLighter
+            item.BorderSizePixel = 0
+            item.Parent = list
+
+            local itemCorner = Instance.new("UICorner")
+            itemCorner.CornerRadius = UDim.new(0, 4)
+            itemCorner.Parent = item
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, -40, 1, 0)
+            nameLabel.Position = UDim2.new(0, 8, 0, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = (isFriend(onlinePlayer) and "[FRIEND] " or "[MANUAL] ") .. name
+            nameLabel.TextColor3 = Colors.Text
+            nameLabel.Font = MinecraftFonts.Body
+            nameLabel.TextSize = 11
+            nameLabel.Parent = item
+
+            local removeBtn = Instance.new("TextButton")
+            removeBtn.Size = UDim2.new(0, 30, 0, 18)
+            removeBtn.Position = UDim2.new(1, -32, 0.5, -9)
+            removeBtn.BackgroundColor3 = Colors.Danger
+            removeBtn.BorderSizePixel = 0
+            removeBtn.Text = "×"
+            removeBtn.TextColor3 = Colors.Text
+            removeBtn.Font = MinecraftFonts.Header
+            removeBtn.TextSize = 14
+            removeBtn.AutoButtonColor = false
+            removeBtn.Parent = item
+
+            local removeCorner = Instance.new("UICorner")
+            removeCorner.CornerRadius = UDim.new(0, 3)
+            removeCorner.Parent = removeBtn
+
+            local function removePlayer()
+                local idx = tableIndexOf(whitelist, name)
+                if idx then
+                    table.remove(whitelist, idx)
+                    callback(whitelist)
+                    saveConfig()
+                    showNotification("Removed " .. name .. " from whitelist")
+                    renderList()
+                end
+            end
+
+            self:_connect(removeBtn.MouseButton1Click, removePlayer)
+            self:_connect(removeBtn.MouseEnter, function()
+                playTween(removeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.DangerLight})
+            end)
+            self:_connect(removeBtn.MouseLeave, function()
+                playTween(removeBtn, TweenInfo_Fast, {BackgroundColor3 = Colors.Danger})
+            end)
+
+            -- Hover effect for item
+            self:_connect(item.MouseEnter, function()
+                playTween(item, TweenInfo_Fast, {BackgroundTransparency = 0.2, BackgroundColor3 = Colors.BackgroundHover})
+            end)
+            self:_connect(item.MouseLeave, function()
+                playTween(item, TweenInfo_Fast, {BackgroundTransparency = 0.98, BackgroundColor3 = Colors.BackgroundLighter})
+            end)
+        end
+
+        -- Auto-scroll to bottom if list is not empty
+        if #list:GetChildren() > 0 then
+            task.spawn(function()
+                task.wait()
+                list.CanvasPosition = Vector2.new(0, list.CanvasPosition.Y + 50)
+            end)
+        end
+    end
+
+    self:_connect(refreshButton.MouseButton1Click, function()
+        renderList()
+        showNotification("List refreshed")
+    end)
+
+    -- AutoComplete logic
+    local function showAutoComplete()
+        local text = inputField.Text:Trim()
+        if text == "" or text == "Enter player name..." then
+            autoCompleteDropdown.Visible = false
+            return
+        end
+        
+        autoCompleteDropdown:ClearAllChildren()
+        
+        local players = Services.Players:GetPlayers()
+        local matches = 0
+        
+        for _, player in ipairs(players) do
+            if player.Name:lower():sub(1, #text) == text:lower():sub(1, #text) then
+                local item = Instance.new("TextButton")
+                item.Size = UDim2.new(1, 0, 0, 24)
+                item.BackgroundColor3 = Colors.BackgroundLighter
+                item.BorderSizePixel = 0
+                item.Text = player.Name
+                item.TextColor3 = Colors.Text
+                item.Font = MinecraftFonts.Body
+                item.TextSize = 11
+                item.AutoButtonColor = false
+                item.Parent = autoCompleteDropdown
+                
+                local itemCorner = Instance.new("UICorner")
+                itemCorner.CornerRadius = UDim.new(0, 3)
+                itemCorner.Parent = item
+                
+                local playerName = player.Name
+                self:_connect(item.MouseButton1Click, function()
+                    inputField.Text = playerName
+                    autoCompleteDropdown.Visible = false
+                end)
+                
+                self:_connect(item.MouseEnter, function()
+                    playTween(item, TweenInfo_Fast, {BackgroundTransparency = 0, BackgroundColor3 = Colors.AccentDark})
+                end)
+                
+                self:_connect(item.MouseLeave, function()
+                    playTween(item, TweenInfo_Fast, {BackgroundTransparency = 0.98, BackgroundColor3 = Colors.BackgroundLighter})
+                end)
+                
+                matches = matches + 1
+                if matches >= 5 then break end
+            end
+        end
+        
+        if matches > 0 then
+            local absPos = inputContainer.AbsolutePosition
+            local absSize = inputContainer.AbsoluteSize
+            autoCompleteDropdown.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y)
+            autoCompleteDropdown.Size = UDim2.new(0, absSize.X, 0, matches * 24 + 8)
+            autoCompleteDropdown.BackgroundTransparency = 0.3
+            autoCompleteDropdown.Visible = true
+        else
+            autoCompleteDropdown.Visible = false
+        end
+    end
+    
+    self:_connect(inputField.FocusLost, function(enterPressed)
+        if enterPressed then
+            addPlayerByName(inputField.Text)
+        end
+    end)
+    
+    self:_connect(inputField.MouseLeave, function()
+        task.delay(0.1, function()
+            autoCompleteDropdown.Visible = false
+        end)
+    end)
+    
+    self:_connect(inputField:GetPropertyChangedSignal("Text"), function()
+        if inputField.Text ~= "" and inputField.Text ~= "Enter player name..." then
+            showAutoComplete()
+        end
+    end)
+    
+    local function closeAutoComplete()
+        autoCompleteDropdown.Visible = false
+    end
+    
+    self:_connect(Services.UserInputService.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = Services.UserInputService:GetMouseLocation()
+            local ap = autoCompleteDropdown.AbsolutePosition
+            local as = autoCompleteDropdown.AbsoluteSize
+            local inAuto = mousePos.X >= ap.X and mousePos.X <= ap.X + as.X
+                       and mousePos.Y >= ap.Y and mousePos.Y <= ap.Y + as.Y
+            if not inAuto and autoCompleteDropdown.Visible then
+                closeAutoComplete()
+            end
+        end
+    end)
+
+    renderList()
+    return {
+        Instance = container,
+        Refresh = renderList,
+    }
+end
+
 function UI:CreateButton(parent, text, callback, style)
     style = style or "default"
 
@@ -1783,7 +2551,7 @@ function UI:CreateButton(parent, text, callback, style)
     label.Font = MinecraftFonts.Header
     label.TextSize = 13
     label.Parent = button
-    applyMinecraftStyle(label, "Header", 13)
+    -- Removed applyMinecraftStyle to preserve TextSecondary color
 
     self:_connect(button.MouseEnter, function()
         playTween(button, TweenInfo_Fast, {BackgroundColor3 = accentColor, BorderColor3 = Colors.Text})
@@ -1850,7 +2618,6 @@ function ESPObject.new(player)
     self.player = player
     self.drawings = {}
     self.skeletonLines = {}
-    self.highlight = nil
     self:_createDrawings()
     return self
 end
@@ -2021,23 +2788,6 @@ function ESPObject:update(camera, localChar, settings)
     else
         for _, line in ipairs(self.skeletonLines) do line.Visible = false end
     end
-    
-    -- Highlight
-    if settings.highlightEnabled then
-        if not self.highlight then
-            self.highlight = Instance.new("Highlight")
-            self.highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            self.highlight.Parent = char
-        end
-        self.highlight.Adornee = char
-        self.highlight.FillColor = settings.highlightFillColor
-        self.highlight.OutlineColor = settings.highlightOutlineColor
-        self.highlight.FillTransparency = settings.highlightFillTransparency
-        self.highlight.OutlineTransparency = settings.highlightOutlineTransparency
-        self.highlight.Enabled = true
-    elseif self.highlight then
-        self.highlight.Enabled = false
-    end
 end
 
 function ESPObject:_updateSkeleton(char, camera, color)
@@ -2076,13 +2826,11 @@ end
 function ESPObject:hide()
     for _, drawing in pairs(self.drawings) do drawing.Visible = false end
     for _, line in ipairs(self.skeletonLines) do line.Visible = false end
-    if self.highlight then self.highlight.Enabled = false end
 end
 
 function ESPObject:destroy()
     for _, drawing in pairs(self.drawings) do pcall(function() drawing:Remove() end) end
     for _, line in ipairs(self.skeletonLines) do pcall(function() line:Remove() end) end
-    if self.highlight then pcall(function() self.highlight:Destroy() end) end
 end
 
 -- ============================================
@@ -2119,6 +2867,8 @@ function AimbotSystem.new()
 end
 
 function AimbotSystem:isTeammate(player)
+    if isWhitelisted(player) then return true end
+    
     if not player.Team or not LocalPlayer.Team then return false end
     return player.Team == LocalPlayer.Team
 end
@@ -2208,6 +2958,9 @@ function AimbotSystem:getTarget(settings)
                         local dist = (Vector2.new(sp.X, sp.Y) - mousePos).Magnitude
                         if dist <= settings.fov then
                             if not settings.wallCheck or self:isVisible(aimPart) then
+                                if isWhitelisted(self.currentTarget) then
+                                    return nil
+                                end
                                 return self.currentTarget
                             end
                         end
@@ -2224,6 +2977,7 @@ function AimbotSystem:getTarget(settings)
     for _, player in ipairs(Services.Players:GetPlayers()) do
         if player == LocalPlayer then continue end
         if settings.teamCheck and self:isTeammate(player) then continue end
+        if isWhitelisted(player) then continue end
         if not player.Character then continue end
         
         local hum = player.Character:FindFirstChildOfClass("Humanoid")
@@ -2249,6 +3003,11 @@ end
 
 function AimbotSystem:update(settings, delta)
     local cam = Services.Workspace.CurrentCamera
+    if not cam then
+        self.fovCircle.Visible = false
+        self.currentTarget = nil
+        return
+    end
     local mousePos = Services.UserInputService:GetMouseLocation()
     
     -- FOV Circle
@@ -2292,6 +3051,7 @@ function AimbotSystem:update(settings, delta)
         local cf = CFrame.lookAt(cam.CFrame.Position, aimPos)
         cam.CFrame = cam.CFrame:Lerp(cf, alpha)
     else
+        if type(mousemoverel) ~= "function" then return end
         local sp = cam:WorldToViewportPoint(aimPos)
         local targetScreen = Vector2.new(sp.X, sp.Y)
         local diff = targetScreen - mousePos
@@ -2311,6 +3071,7 @@ function AimbotSystem:processTriggerbot(settings, camera)
     for _, player in ipairs(Services.Players:GetPlayers()) do
         if player == LocalPlayer then continue end
         if settings.teamCheck and self:isTeammate(player) then continue end
+        if isWhitelisted(player) then continue end
         if not player.Character then continue end
         
         local hum = player.Character:FindFirstChildOfClass("Humanoid")
@@ -2329,6 +3090,7 @@ function AimbotSystem:processTriggerbot(settings, camera)
                 
                 self.triggerbotCooldown = now
                 task.spawn(function()
+                    if type(mouse1press) ~= "function" or type(mouse1release) ~= "function" then return end
                     mouse1press()
                     task.wait(0.03 + math.random() * 0.02)
                     mouse1release()
@@ -2370,17 +3132,135 @@ function AimbotSystem:destroy()
 end
 
 -- ============================================
--- MISC SYSTEM (Empty - removed detection-prone features)
+-- MISC SYSTEM
 -- ============================================
 local MiscSystem = {}
 MiscSystem.__index = MiscSystem
 
 function MiscSystem.new()
     local self = setmetatable({}, MiscSystem)
+    self.nightModeEnabled = false
+    self.nightModeBrightness = 1
+    self.originalLighting = nil
+    self.aspectRatioEnabled = false
+    self.aspectCamera = nil
+    self.originalAspectFov = nil
+    self.lastAspectCamera = nil
+    self.lastAspectViewport = nil
+    self.lastAspectWidth = nil
+    self.lastAspectHeight = nil
+    self.lastAspectFov = nil
     return self
 end
 
 function MiscSystem:destroy()
+    self:setNightMode(false)
+    self:setAspectRatio(false)
+end
+
+function MiscSystem:setNightMode(enabled, brightness)
+    enabled = enabled == true
+    brightness = math.clamp(tonumber(brightness) or 1, 0, 5)
+    if enabled == self.nightModeEnabled and (not enabled or brightness == self.nightModeBrightness) then
+        if enabled then self:applyNightMode() end
+        return
+    end
+
+    local lighting = Services.Lighting
+    if enabled then
+        if not self.originalLighting then
+            self.originalLighting = {
+                Ambient = lighting.Ambient,
+                OutdoorAmbient = lighting.OutdoorAmbient,
+                Brightness = lighting.Brightness,
+                ClockTime = lighting.ClockTime,
+                FogColor = lighting.FogColor,
+                FogEnd = lighting.FogEnd,
+            }
+        end
+
+        self.nightModeEnabled = true
+        self.nightModeBrightness = brightness
+        self:applyNightMode()
+    elseif self.originalLighting then
+        for property, value in pairs(self.originalLighting) do
+            pcall(function()
+                lighting[property] = value
+            end)
+        end
+        self.originalLighting = nil
+    end
+
+    self.nightModeEnabled = enabled
+    self.nightModeBrightness = brightness
+end
+
+function MiscSystem:applyNightMode()
+    if not self.nightModeEnabled then return end
+
+    local lighting = Services.Lighting
+    pcall(function() lighting.Ambient = Color3.fromRGB(25, 25, 45) end)
+    pcall(function() lighting.OutdoorAmbient = Color3.fromRGB(10, 10, 25) end)
+    pcall(function() lighting.Brightness = self.nightModeBrightness end)
+    pcall(function() lighting.ClockTime = 0 end)
+    pcall(function() lighting.FogColor = Color3.fromRGB(15, 15, 35) end)
+    pcall(function() lighting.FogEnd = 1000 end)
+end
+
+function MiscSystem:setAspectRatio(enabled, width, height)
+    self.aspectRatioEnabled = enabled == true
+    self.aspectRatioWidth = math.max(1, tonumber(width) or 16)
+    self.aspectRatioHeight = math.max(1, tonumber(height) or 9)
+    self:applyAspectRatio(true)
+end
+
+function MiscSystem:applyAspectRatio(force)
+    local ok, camera = pcall(function()
+        return Services.Workspace.CurrentCamera
+    end)
+    if not ok or not camera then return end
+
+    local viewportOk, viewport = pcall(function() return camera.ViewportSize end)
+    if not viewportOk or not viewport then return end
+    local viewportKey = tostring(viewport.X) .. ":" .. tostring(viewport.Y)
+    local currentFovOk, currentFov = pcall(function() return camera.FieldOfView end)
+    if not currentFovOk then return end
+    if not force and camera == self.lastAspectCamera and viewportKey == self.lastAspectViewport
+        and self.aspectRatioWidth == self.lastAspectWidth and self.aspectRatioHeight == self.lastAspectHeight
+        and math.abs(currentFov - (self.lastAspectFov or currentFov)) < 0.01 then
+        return
+    end
+
+    if not self.aspectRatioEnabled then
+        local originalFov = self.originalAspectFov
+        if self.aspectCamera and self.originalAspectFov then
+            pcall(function() self.aspectCamera.FieldOfView = self.originalAspectFov end)
+        end
+        self.aspectCamera = nil
+        self.originalAspectFov = nil
+        self.lastAspectCamera = camera
+        self.lastAspectViewport = viewportKey
+        self.lastAspectWidth = self.aspectRatioWidth
+        self.lastAspectHeight = self.aspectRatioHeight
+        self.lastAspectFov = originalFov
+        return
+    end
+
+    local currentAspect = viewport.Y > 0 and viewport.X / viewport.Y or (16 / 9)
+    local targetAspect = self.aspectRatioWidth / self.aspectRatioHeight
+    if self.aspectCamera ~= camera then
+        self.aspectCamera = camera
+        self.originalAspectFov = currentFov
+    end
+
+    local baseFov = self.originalAspectFov or currentFov
+    local adjustedFov = math.deg(2 * math.atan(math.tan(math.rad(baseFov) / 2) * targetAspect / currentAspect))
+    pcall(function() camera.FieldOfView = math.clamp(adjustedFov, 1, 120) end)
+    self.lastAspectCamera = camera
+    self.lastAspectViewport = viewportKey
+    self.lastAspectWidth = self.aspectRatioWidth
+    self.lastAspectHeight = self.aspectRatioHeight
+    self.lastAspectFov = adjustedFov
 end
 
 function MiscSystem:updateWalkSpeed(speed, loop)
@@ -2393,10 +3273,6 @@ function MiscSystem:updateWalkSpeed(speed, loop)
     if hum then
         hum.WalkSpeed = speed
     end
-end
-
-function MiscSystem:destroy()
-    -- Cleanup noclip if active
 end
 
 -- ============================================
@@ -2435,10 +3311,42 @@ function App:_buildUI()
     -- Create tabs
     local visualsContent = self.ui:AddTab("VISUALS")
     local aimbotContent = self.ui:AddTab("AIMBOT")
+    local miscContent = self.ui:AddTab("MISC")
     local configContent = self.ui:AddTab("CONFIG")
     
     -- VISUALS TAB
     local espGeneral = self.ui:AddSection(visualsContent, "ESP General", Colors.Accent)
+    local miscGeneral = self.ui:AddSection(miscContent, "Display", Colors.Accent)
+    self.nightModeToggle = self.ui:CreateToggle(miscGeneral, "Nightmode", ConfigData.misc.nightmode, function(v)
+        ConfigData.misc.nightmode = v
+        self.misc:setNightMode(v, ConfigData.misc.nightmodeBrightness)
+    end)
+    self.ui.sliderNightModeBrightness = self.ui:CreateSlider(miscGeneral, "Nightmode Brightness", 0, 500, ConfigData.misc.nightmodeBrightness * 100, function(v)
+        ConfigData.misc.nightmodeBrightness = v / 100
+        self.misc:setNightMode(ConfigData.misc.nightmode, ConfigData.misc.nightmodeBrightness)
+    end, "%")
+    self.nightModePersistToggle = self.ui:CreateToggle(miscGeneral, "Keep Nightmode on Round Start", ConfigData.misc.nightmodePersist, function(v)
+        ConfigData.misc.nightmodePersist = v
+    end)
+    self.aspectRatioToggle = self.ui:CreateToggle(miscGeneral, "Aspect Ratio Stretch", ConfigData.misc.aspectRatioEnabled, function(v)
+        ConfigData.misc.aspectRatioEnabled = v
+        self.misc:setAspectRatio(v, ConfigData.misc.aspectRatioWidth, ConfigData.misc.aspectRatioHeight)
+    end)
+    self.ui.sliderAspectRatioWidth = self.ui:CreateSlider(miscGeneral, "Aspect Width", 1, 40, ConfigData.misc.aspectRatioWidth, function(v)
+        ConfigData.misc.aspectRatioWidth = v
+        self.misc:setAspectRatio(ConfigData.misc.aspectRatioEnabled, v, ConfigData.misc.aspectRatioHeight)
+    end)
+    self.ui.sliderAspectRatioHeight = self.ui:CreateSlider(miscGeneral, "Aspect Height", 1, 40, ConfigData.misc.aspectRatioHeight, function(v)
+        ConfigData.misc.aspectRatioHeight = v
+        self.misc:setAspectRatio(ConfigData.misc.aspectRatioEnabled, ConfigData.misc.aspectRatioWidth, v)
+    end)
+    self.ui:CreateButton(miscGeneral, "Reset Aspect Ratio to 16:9", function()
+        ConfigData.misc.aspectRatioWidth = 16
+        ConfigData.misc.aspectRatioHeight = 9
+        if self.ui.sliderAspectRatioWidth then self.ui.sliderAspectRatioWidth:Set(16) end
+        if self.ui.sliderAspectRatioHeight then self.ui.sliderAspectRatioHeight:Set(9) end
+        self.misc:setAspectRatio(ConfigData.misc.aspectRatioEnabled, 16, 9)
+    end)
     self.espToggle = self.ui:CreateToggle(espGeneral, "Enable ESP", ConfigData.esp.enabled, function(v) ConfigData.esp.enabled = v end)
     self.ui.boxToggle = self.ui:CreateToggle(espGeneral, "Box ESP", ConfigData.esp.boxEnabled, function(v) ConfigData.esp.boxEnabled = v end)
     self.ui.dropdownBoxType = self.ui:CreateDropdown(espGeneral, "Box Type", {"Standard", "Corner", "Rounded", "Dashed"}, ConfigData.esp.boxType, function(v) ConfigData.esp.boxType = v end)
@@ -2448,12 +3356,16 @@ function App:_buildUI()
     self.ui.healthBarToggle = self.ui:CreateToggle(espGeneral, "Health Bar", ConfigData.esp.healthBarEnabled, function(v) ConfigData.esp.healthBarEnabled = v end)
     self.ui:CreateToggle(espGeneral, "Team Check", ConfigData.esp.teamCheck, function(v) ConfigData.esp.teamCheck = v end)
     
+    -- Whitelist section
+    local espWhitelist = self.ui:AddSection(visualsContent, "Whitelist", Colors.Accent)
+    self.ui.whitelistScroll = self.ui:CreateWhitelistList(espWhitelist, ConfigData.esp.whitelist, function(list)
+        ConfigData.esp.whitelist = list
+        ConfigData.aimbot.whitelist = list
+    end)
+    
     local espVisual = self.ui:AddSection(visualsContent, "Visual Effects", Colors.Accent)
     self.ui.skeletonToggle = self.ui:CreateToggle(espVisual, "Skeleton", ConfigData.esp.skeletonEnabled, function(v) ConfigData.esp.skeletonEnabled = v end)
     self.ui.colorSkeletonColor = self.ui:CreateColorPicker(espVisual, "Skeleton Color", ConfigData.esp.skeletonColor, "esp", "skeletonColor", function(c) ConfigData.esp.skeletonColor = c end)
-    self.ui.highlightToggle = self.ui:CreateToggle(espVisual, "Highlight Chams", ConfigData.esp.highlightEnabled, function(v) ConfigData.esp.highlightEnabled = v end)
-    self.ui.colorHighlightColor = self.ui:CreateColorPicker(espVisual, "Fill Color", ConfigData.esp.highlightFillColor, "esp", "highlightFillColor", function(c) ConfigData.esp.highlightFillColor = c end)
-    self.ui.sliderFillTransparency = self.ui:CreateSlider(espVisual, "Fill Transparency", 0, 100, ConfigData.esp.highlightFillTransparency * 100, function(v) ConfigData.esp.highlightFillTransparency = v / 100 end, "%")
     self.ui.snaplineToggle = self.ui:CreateToggle(espVisual, "Snaplines", ConfigData.esp.snaplineEnabled, function(v) ConfigData.esp.snaplineEnabled = v end)
     self.ui.dropdownSnaplineMode = self.ui:CreateDropdown(espVisual, "Snapline Origin", {"Bottom", "Center", "Top"}, ConfigData.esp.snaplineMode, function(v) ConfigData.esp.snaplineMode = v end)
     
@@ -2465,7 +3377,6 @@ function App:_buildUI()
     self.ui.colorSnaplineColor = self.ui:CreateColorPicker(espColors, "Snapline Color", ConfigData.esp.snaplineColor, "esp", "snaplineColor", function(c) ConfigData.esp.snaplineColor = c end)
     self.ui.colorDistanceColor = self.ui:CreateColorPicker(espColors, "Distance Color", ConfigData.esp.distanceColor, "esp", "distanceColor", function(c) ConfigData.esp.distanceColor = c end)
     self.ui.colorHealthBarColor = self.ui:CreateColorPicker(espColors, "Health Bar Color", ConfigData.esp.healthBarColor, "esp", "healthBarColor", function(c) ConfigData.esp.healthBarColor = c end)
-    self.ui.colorHighlightOutlineColor = self.ui:CreateColorPicker(espColors, "Highlight Outline", ConfigData.esp.highlightOutlineColor, "esp", "highlightOutlineColor", function(c) ConfigData.esp.highlightOutlineColor = c end)
     
     -- AIMBOT TAB
     local aimGeneral = self.ui:AddSection(aimbotContent, "Aimbot Settings", Colors.Accent)
@@ -2529,22 +3440,39 @@ function App:_applyConfig()
     -- Apply toggles
     if self.espToggle then self.espToggle:Set(ConfigData.esp.enabled) end
     if self.aimbotToggle then self.aimbotToggle:Set(ConfigData.aimbot.enabled) end
+    if self.nightModeToggle then self.nightModeToggle:Set(ConfigData.misc.nightmode) end
+    if self.ui.sliderNightModeBrightness then self.ui.sliderNightModeBrightness:Set(ConfigData.misc.nightmodeBrightness * 100) end
+    if self.nightModePersistToggle then self.nightModePersistToggle:Set(ConfigData.misc.nightmodePersist) end
+    if self.aspectRatioToggle then self.aspectRatioToggle:Set(ConfigData.misc.aspectRatioEnabled) end
+    if self.ui.sliderAspectRatioWidth then self.ui.sliderAspectRatioWidth:Set(ConfigData.misc.aspectRatioWidth) end
+    if self.ui.sliderAspectRatioHeight then self.ui.sliderAspectRatioHeight:Set(ConfigData.misc.aspectRatioHeight) end
+    self.misc:setNightMode(ConfigData.misc.nightmode, ConfigData.misc.nightmodeBrightness)
+    self.misc:setAspectRatio(ConfigData.misc.aspectRatioEnabled, ConfigData.misc.aspectRatioWidth, ConfigData.misc.aspectRatioHeight)
+    if self.ui.whitelistScroll and self.ui.whitelistScroll.Refresh then
+        self.ui.whitelistScroll.Refresh()
+    end
+    if self.ui.boxToggle then self.ui.boxToggle:Set(ConfigData.esp.boxEnabled) end
+    if self.ui.outlineToggle then self.ui.outlineToggle:Set(ConfigData.esp.outlineEnabled) end
+    if self.ui.nameToggle then self.ui.nameToggle:Set(ConfigData.esp.nameEnabled) end
+    if self.ui.distanceToggle then self.ui.distanceToggle:Set(ConfigData.esp.distanceEnabled) end
+    if self.ui.healthBarToggle then self.ui.healthBarToggle:Set(ConfigData.esp.healthBarEnabled) end
+    if self.ui.skeletonToggle then self.ui.skeletonToggle:Set(ConfigData.esp.skeletonEnabled) end
+    if self.ui.snaplineToggle then self.ui.snaplineToggle:Set(ConfigData.esp.snaplineEnabled) end
+    if self.ui.showFovToggle then self.ui.showFovToggle:Set(ConfigData.aimbot.showFov) end
+    if self.ui.triggerbotToggle then self.ui.triggerbotToggle:Set(ConfigData.aimbot.triggerbotEnabled) end
     
     -- Apply sliders
-    if self.ui.sliderWalkSpeed then self.ui.sliderWalkSpeed:Set(ConfigData.misc.walkSpeed) end
     if self.ui.sliderFOV then self.ui.sliderFOV:Set(ConfigData.aimbot.fov) end
     if self.ui.sliderSmoothness then self.ui.sliderSmoothness:Set(ConfigData.aimbot.smoothness) end
     if self.ui.sliderTriggerbotDelay then self.ui.sliderTriggerbotDelay:Set(ConfigData.aimbot.triggerbotDelay) end
     if self.ui.sliderTriggerbotFOV then self.ui.sliderTriggerbotFOV:Set(ConfigData.aimbot.triggerbotFov) end
     if self.ui.sliderPrediction then self.ui.sliderPrediction:Set(ConfigData.aimbot.prediction * 1000) end
-    if self.ui.sliderFillTransparency then self.ui.sliderFillTransparency:Set(ConfigData.esp.highlightFillTransparency * 100) end
     
     -- Apply dropdowns
     if self.ui.dropdownBoxType then self.ui.dropdownBoxType:Set(ConfigData.esp.boxType) end
     if self.ui.dropdownSnaplineMode then self.ui.dropdownSnaplineMode:Set(ConfigData.esp.snaplineMode) end
     if self.ui.dropdownActivationKey then self.ui.dropdownActivationKey:Set(ConfigData.aimbot.activationKey) end
     if self.ui.dropdownBodyAim then self.ui.dropdownBodyAim:Set(ConfigData.aimbot.bodyAim) end
-    if self.ui.dropdownHitboxPart then self.ui.dropdownHitboxPart:Set(ConfigData.misc.hitboxPart) end
     
     -- Apply colors
     if self.ui.colorBoxColor then self.ui.colorBoxColor:Set(ConfigData.esp.boxColor) end
@@ -2554,44 +3482,7 @@ function App:_applyConfig()
     if self.ui.colorDistanceColor then self.ui.colorDistanceColor:Set(ConfigData.esp.distanceColor) end
     if self.ui.colorHealthBarColor then self.ui.colorHealthBarColor:Set(ConfigData.esp.healthBarColor) end
     if self.ui.colorSkeletonColor then self.ui.colorSkeletonColor:Set(ConfigData.esp.skeletonColor) end
-    if self.ui.colorHighlightColor then self.ui.colorHighlightColor:Set(ConfigData.esp.highlightFillColor) end
-    if self.ui.colorHighlightOutlineColor then self.ui.colorHighlightOutlineColor:Set(ConfigData.esp.highlightOutlineColor) end
     if self.ui.colorFovColor then self.ui.colorFovColor:Set(ConfigData.aimbot.fovColor) end
-    
-    -- Apply sliders
-    if self.ui.sliderFOV then self.ui.sliderFOV:Set(ConfigData.aimbot.fov) end
-    if self.ui.sliderSmoothness then self.ui.sliderSmoothness:Set(ConfigData.aimbot.smoothness) end
-    if self.ui.sliderTriggerbotDelay then self.ui.sliderTriggerbotDelay:Set(ConfigData.aimbot.triggerbotDelay) end
-    if self.ui.sliderTriggerbotFOV then self.ui.sliderTriggerbotFOV:Set(ConfigData.aimbot.triggerbotFov) end
-    if self.ui.sliderPrediction then self.ui.sliderPrediction:Set(ConfigData.aimbot.prediction * 1000) end
-    if self.ui.sliderFillTransparency then self.ui.sliderFillTransparency:Set(ConfigData.esp.highlightFillTransparency * 100) end
-    if self.ui.sliderWalkSpeed then self.ui.sliderWalkSpeed:Set(ConfigData.misc.walkSpeed) end
-    if self.ui.sliderFlySpeed then self.ui.sliderFlySpeed:Set(ConfigData.misc.flySpeed) end
-    if self.ui.sliderHitboxSize then self.ui.sliderHitboxSize:Set(ConfigData.misc.hitboxSize) end
-    if self.ui.sliderHitboxTransparency then self.ui.sliderHitboxTransparency:Set(ConfigData.misc.hitboxTransparency * 100) end
-    
-    -- Apply dropdowns
-    if self.ui.dropdownBoxType then self.ui.dropdownBoxType:Set(ConfigData.esp.boxType) end
-    if self.ui.dropdownSnaplineMode then self.ui.dropdownSnaplineMode:Set(ConfigData.esp.snaplineMode) end
-    if self.ui.dropdownActivationKey then self.ui.dropdownActivationKey:Set(ConfigData.aimbot.activationKey) end
-    if self.ui.dropdownBodyAim then self.ui.dropdownBodyAim:Set(ConfigData.aimbot.bodyAim) end
-    if self.ui.dropdownHitboxPart then self.ui.dropdownHitboxPart:Set(ConfigData.misc.hitboxPart) end
-    
-    -- Apply toggles
-    if self.espToggle then self.espToggle:Set(ConfigData.esp.enabled) end
-    if self.aimbotToggle then self.aimbotToggle:Set(ConfigData.aimbot.enabled) end
-    if self.flyToggle then self.flyToggle:Set(ConfigData.misc.flyEnabled) end
-    if self.hitboxToggle then self.hitboxToggle:Set(ConfigData.misc.hitboxEnabled) end
-    if self.ui.boxToggle then self.ui.boxToggle:Set(ConfigData.esp.boxEnabled) end
-    if self.ui.outlineToggle then self.ui.outlineToggle:Set(ConfigData.esp.outlineEnabled) end
-    if self.ui.nameToggle then self.ui.nameToggle:Set(ConfigData.esp.nameEnabled) end
-    if self.ui.distanceToggle then self.ui.distanceToggle:Set(ConfigData.esp.distanceEnabled) end
-    if self.ui.healthBarToggle then self.ui.healthBarToggle:Set(ConfigData.esp.healthBarEnabled) end
-    if self.ui.skeletonToggle then self.ui.skeletonToggle:Set(ConfigData.esp.skeletonEnabled) end
-    if self.ui.highlightToggle then self.ui.highlightToggle:Set(ConfigData.esp.highlightEnabled) end
-    if self.ui.snaplineToggle then self.ui.snaplineToggle:Set(ConfigData.esp.snaplineEnabled) end
-    if self.ui.showFovToggle then self.ui.showFovToggle:Set(ConfigData.aimbot.showFov) end
-    if self.ui.triggerbotToggle then self.ui.triggerbotToggle:Set(ConfigData.aimbot.triggerbotEnabled) end
     
     print("Config applied to UI")
     print("ConfigData saved settings:", ConfigData.esp.enabled, ConfigData.esp.boxEnabled, ConfigData.aimbot.enabled)
@@ -2614,10 +3505,7 @@ function App:_bindConfigToUI()
     table.insert(self.uiElements, {type="color", ref=self.ui.colorHealthBarColor, category="esp", key="healthBarColor"})
     table.insert(self.uiElements, {type="toggle", ref=self.ui.skeletonToggle, category="esp", key="skeletonEnabled"})
     table.insert(self.uiElements, {type="color", ref=self.ui.colorSkeletonColor, category="esp", key="skeletonColor"})
-    table.insert(self.uiElements, {type="toggle", ref=self.ui.highlightToggle, category="esp", key="highlightEnabled"})
-    table.insert(self.uiElements, {type="color", ref=self.ui.colorHighlightColor, category="esp", key="highlightFillColor"})
-    table.insert(self.uiElements, {type="color", ref=self.ui.colorHighlightOutlineColor, category="esp", key="highlightOutlineColor"})
-    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderFillTransparency, category="esp", key="highlightFillTransparency"})
+
     table.insert(self.uiElements, {type="toggle", ref=self.ui.snaplineToggle, category="esp", key="snaplineEnabled"})
     table.insert(self.uiElements, {type="color", ref=self.ui.colorSnaplineColor, category="esp", key="snaplineColor"})
     table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownSnaplineMode, category="esp", key="snaplineMode"})
@@ -2636,13 +3524,12 @@ function App:_bindConfigToUI()
     table.insert(self.uiElements, {type="slider", ref=self.ui.sliderPrediction, category="aimbot", key="prediction"})
     
     -- Misc
-    table.insert(self.uiElements, {type="toggle", ref=self.flyToggle, category="misc", key="flyEnabled"})
-    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderWalkSpeed, category="misc", key="walkSpeed"})
-    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderFlySpeed, category="misc", key="flySpeed"})
-    table.insert(self.uiElements, {type="toggle", ref=self.hitboxToggle, category="misc", key="hitboxEnabled"})
-    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderHitboxSize, category="misc", key="hitboxSize"})
-    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderHitboxTransparency, category="misc", key="hitboxTransparency"})
-    table.insert(self.uiElements, {type="dropdown", ref=self.ui.dropdownHitboxPart, category="misc", key="hitboxPart"})
+    table.insert(self.uiElements, {type="toggle", ref=self.nightModeToggle, category="misc", key="nightmode"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderNightModeBrightness, category="misc", key="nightmodeBrightness"})
+    table.insert(self.uiElements, {type="toggle", ref=self.nightModePersistToggle, category="misc", key="nightmodePersist"})
+    table.insert(self.uiElements, {type="toggle", ref=self.aspectRatioToggle, category="misc", key="aspectRatioEnabled"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderAspectRatioWidth, category="misc", key="aspectRatioWidth"})
+    table.insert(self.uiElements, {type="slider", ref=self.ui.sliderAspectRatioHeight, category="misc", key="aspectRatioHeight"})
 end
 
 function App:notify(title, message)
@@ -2654,17 +3541,35 @@ function App:_setupESP()
     local function onPlayerAdded(player)
         if player == LocalPlayer then return end
         self.espObjects[player] = ESPObject.new(player)
+        task.spawn(function()
+            cacheFriendship(player)
+            if isFriend(player) and not tableFind(ConfigData.esp.whitelist, player.Name) then
+                table.insert(ConfigData.esp.whitelist, player.Name)
+                ConfigData.aimbot.whitelist = ConfigData.esp.whitelist
+                saveConfig()
+            end
+            if self.ui.whitelistScroll and self.ui.whitelistScroll.Refresh then
+                self.ui.whitelistScroll.Refresh()
+            end
+        end)
     end
     
     local function onPlayerRemoving(player)
+        friendCache[player.UserId] = nil
         if self.espObjects[player] then
             self.espObjects[player]:destroy()
             self.espObjects[player] = nil
+        end
+        if self.ui.whitelistScroll and self.ui.whitelistScroll.Refresh then
+            self.ui.whitelistScroll.Refresh()
         end
     end
     
     for _, player in ipairs(Services.Players:GetPlayers()) do
         onPlayerAdded(player)
+        if player ~= LocalPlayer then
+            task.spawn(function() cacheFriendship(player) end)
+        end
     end
     
     self.ui:_connect(Services.Players.PlayerAdded, onPlayerAdded)
@@ -2677,11 +3582,15 @@ function App:_setupESP()
         end
         
         local cam = Services.Workspace.CurrentCamera
+        if not cam then
+            for _, obj in pairs(self.espObjects) do obj:hide() end
+            return
+        end
         local localChar = LocalPlayer.Character
         
         for player, obj in pairs(self.espObjects) do
             local isTeammate = ConfigData.esp.teamCheck and player.Team == LocalPlayer.Team
-            if not isTeammate then
+            if not isTeammate and not isWhitelisted(player) then
                 obj:update(cam, localChar, ConfigData.esp)
             else
                 obj:hide()
@@ -2705,7 +3614,23 @@ function App:_setupAimbot()
 end
 
 function App:_setupMisc()
-    -- No misc features enabled (all removed due to detection)
+    local lightingCheckElapsed = 0
+
+    -- Round scripts can reset Lighting, but checking four times per second avoids per-frame property contention.
+    self.ui:_connect(Services.RunService.RenderStepped, function(delta)
+        lightingCheckElapsed = lightingCheckElapsed + delta
+        if lightingCheckElapsed >= 0.25 then
+            lightingCheckElapsed = 0
+            if ConfigData.misc.nightmode and ConfigData.misc.nightmodePersist then
+                self.misc:setNightMode(true, ConfigData.misc.nightmodeBrightness)
+            end
+        end
+
+        self.misc.aspectRatioEnabled = ConfigData.misc.aspectRatioEnabled == true
+        self.misc.aspectRatioWidth = math.max(1, tonumber(ConfigData.misc.aspectRatioWidth) or 16)
+        self.misc.aspectRatioHeight = math.max(1, tonumber(ConfigData.misc.aspectRatioHeight) or 9)
+        self.misc:applyAspectRatio(false)
+    end)
 end
 
 function App:_setupHotkeys()
