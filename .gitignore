@@ -1,0 +1,28 @@
+# Local application binaries and runtime files
+/Bin/
+/runtimes/
+/VelocityLite.exe.WebView2/
+/*.dll
+/*.exe
+/*.pdb
+/*.deps.json
+/*.runtimeconfig.json
+/*.xml
+
+# Local executor workspace and generated configuration
+/Workspace/
+UtilityPanelConfig_v2.json
+BlatantConfig_v2.json
+
+# Local assistant/bootstrap files
+/agent.md
+/claude-code-jailbreak-guide.md
+/claude-liberation.bat
+/claude-liberation.ps1
+/claude-liberation.sh
+
+# Editor and OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
